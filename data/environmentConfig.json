@@ -48,9 +48,9 @@
     "maxSpeed": 30,
     "parallaxFactor": 0.08,
     "minTopYRatio": 0.02,
-    "maxTopYRatio": 0.12,
-    "minScale": 0.2,
-    "maxScale": 0.6,
+    "maxTopYRatio": 0.18,
+    "minScale": 0.6,
+    "maxScale": 1.1,
     "floatAmplitude": 6,
     "floatSpeed": 1.2
   },
@@ -77,15 +77,11 @@
   },
   "depthVisuals": {
     "minBlur": 0.0,
-    "maxBlur": 2.0,
-    "minOpacity": 0.70,
-    "maxOpacity": 1.0
+    "maxBlur": 2.0
   },
   "bottomOverlaySettings": {
     "minScale": 1.10,
     "maxScale": 1.60,
-    "minOpacity": 0.95,
-    "maxOpacity": 1.0,
     "bushDensity": 0.60,
     "flowerDensity": 1.40,
     "speed": 1.30,

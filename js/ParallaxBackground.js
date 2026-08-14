@@ -1,8 +1,8 @@
 /* *********************************************************
-   Module 1.20.0 : Solid Mountain & Grid-Spaced Cloud Parallax Engine
-   Description: Resolves mountain transparency issues by forcing full mountain 
-   opacity (1.0) so clouds pass naturally behind peaks. Implements a segmented grid 
-   spacing algorithm for cloud generation to ensure even distribution across the sky.
+   Module 1.21.0 : Fully Opaque Foliage Engine (No Opacity Bleed)
+   Description: Removes alpha/opacity handling from tree, bush, and foliage rendering.
+   All ground and overlay elements are drawn completely solid (opacity 1.0) to prevent
+   unwanted x-ray visibility of mountains and background layers through objects.
 ************************************************************/
 
 class ParallaxBackground {
@@ -122,7 +122,6 @@ class ParallaxBackground {
             const img = this.cloudAssets[Math.floor(Math.random() * this.cloudAssets.length)];
             const scale = this.getRandomRange(conf.minScale || 0.6, conf.maxScale || 1.1);
             
-            // Grid slot placement with subtle random offset (jitter)
             const slotStartX = (i * segmentWidth) - 200;
             const jitterX = this.getRandomRange(0, segmentWidth * 0.4);
 
@@ -133,8 +132,7 @@ class ParallaxBackground {
                 scale: scale,
                 driftSpeed: this.getRandomRange(conf.minSpeed || 12, conf.maxSpeed || 30),
                 noisePhase: Math.random() * Math.PI * 2,
-                noiseSpeed: this.getRandomRange(0.8, 1.8),
-                opacity: this.getRandomRange(0.85, 1.0)
+                noiseSpeed: this.getRandomRange(0.8, 1.8)
             });
         }
     }
@@ -293,14 +291,12 @@ class ParallaxBackground {
                 if (pool.length > 0) {
                     const img = pool[Math.floor(Math.random() * pool.length)];
                     const scale = this.getRandomRange(settings.minScale, settings.maxScale);
-                    const opacity = this.getRandomRange(settings.minOpacity, settings.maxOpacity);
                     const yOffset = this.getRandomRange(settings.minYOffset || -15, settings.maxYOffset || 30);
 
                     const item = {
                         x: currentX,
                         img: img,
                         scale: scale,
-                        opacity: opacity,
                         yOffset: yOffset
                     };
 
@@ -326,7 +322,7 @@ class ParallaxBackground {
     }
 
     /**
-     * Clouds with smooth floating sine-wave and wrapping without clustering
+     * Clouds Renderer
      */
     drawClouds(worldDistance, deltaTime) {
         if (this.activeClouds.length === 0 || !this.config.cloudSettings) return;
@@ -341,16 +337,13 @@ class ParallaxBackground {
         this.activeClouds.forEach(cloud => {
             if (!cloud.img || !cloud.img.complete) return;
 
-            // Idle wind drifting
             cloud.x += cloud.driftSpeed * deltaTime;
 
-            // Floating Sine noise
             cloud.noisePhase += cloud.noiseSpeed * deltaTime;
             const sineYOffset = Math.sin(cloud.noisePhase) * amplitude;
 
             const screenX = (cloud.x - (worldDistance * parallaxFactor));
 
-            // Infinite Horizontal Wrap with screen padding
             let wrappedX = screenX % totalSpan;
             if (wrappedX < -300) wrappedX += totalSpan;
             wrappedX -= 300;
@@ -360,14 +353,14 @@ class ParallaxBackground {
             const drawY = (screenHeight * cloud.baseTopYRatio) + sineYOffset;
 
             this.ctx.save();
-            this.ctx.globalAlpha = cloud.opacity;
+            this.ctx.globalAlpha = 1.0; // Fully solid clouds
             this.ctx.drawImage(cloud.img, wrappedX, drawY, drawWidth, drawHeight);
             this.ctx.restore();
         });
     }
 
     /**
-     * Opaque Solid Mountain Renderer (Opacity 1.0 prevents cloud see-through)
+     * Opaque Solid Mountain Renderer
      */
     drawMountains(worldDistance) {
         if (this.mountainAssets.length === 0 || !this.config.mountainSettings) return;
@@ -390,8 +383,7 @@ class ParallaxBackground {
             const offsetX = (worldDistance * layerSpeed) % drawWidth;
 
             this.ctx.save();
-            // Solid Opacity ensures clean occlusion over clouds
-            this.ctx.globalAlpha = conf.opacity || 1.0; 
+            this.ctx.globalAlpha = 1.0; // Fully solid mountains
 
             for (let x = -drawWidth; x < screenWidth + drawWidth; x += drawWidth) {
                 this.ctx.drawImage(
@@ -408,7 +400,7 @@ class ParallaxBackground {
     }
 
     /**
-     * Unified Ground Track Renderer with Dynamic Visual Depth
+     * Unified Ground Track Renderer - Strictly Solid (Opacity = 1.0)
      */
     drawGroundElements(worldDistance) {
         if (!this.isConfigLoaded || this.groundElements.length === 0) return;
@@ -417,7 +409,7 @@ class ParallaxBackground {
         const screenHeight = this.canvas.height;
         const speed = 1.0; 
 
-        const depthVis = this.config.depthVisuals || { minBlur: 0, maxBlur: 2, minOpacity: 0.7, maxOpacity: 1.0 };
+        const depthVis = this.config.depthVisuals || { minBlur: 0, maxBlur: 2 };
         const minZoneRatio = 0.3750;
         const maxZoneRatio = 0.5000;
 
@@ -432,10 +424,10 @@ class ParallaxBackground {
                 const clampedFactor = Math.max(0, Math.min(1, depthFactor));
 
                 const calculatedBlur = depthVis.minBlur + (depthVis.maxBlur - depthVis.minBlur) * clampedFactor;
-                const calculatedOpacity = depthVis.maxOpacity - (depthVis.maxOpacity - depthVis.minOpacity) * clampedFactor;
 
                 this.ctx.save();
-                this.ctx.globalAlpha = calculatedOpacity;
+                // অপাসিটি ফিক্স: সম্পূর্ণ নিরেট রেন্ডারিং
+                this.ctx.globalAlpha = 1.0;
 
                 if (calculatedBlur > 0.1) {
                     this.ctx.filter = `blur(${calculatedBlur.toFixed(1)}px)`;
@@ -455,7 +447,7 @@ class ParallaxBackground {
     }
 
     /**
-     * Continuous Camera Foreground Overlay Renderer
+     * Continuous Camera Foreground Overlay Renderer - Strictly Solid (Opacity = 1.0)
      */
     drawBottomOverlay(worldDistance) {
         if (!this.isConfigLoaded || !this.config.bottomOverlaySettings) return;
@@ -482,7 +474,9 @@ class ParallaxBackground {
                     const blurVal = settings.blur || 3;
                     const brightnessVal = settings.brightness || 0.65;
                     this.ctx.filter = `blur(${blurVal}px) brightness(${brightnessVal})`;
-                    this.ctx.globalAlpha = item.opacity;
+                    
+                    // অপাসিটি ফিক্স: সম্পূর্ণ নিরেট রেন্ডারিং
+                    this.ctx.globalAlpha = 1.0;
 
                     const drawWidth = img.width * item.scale;
                     const drawHeight = img.height * item.scale;
@@ -526,7 +520,7 @@ class ParallaxBackground {
     }
 
     /**
-     * Correct Layer Ordering Pipeline: Sky -> Clouds -> Mountains -> Ground -> Foliage -> Overlay
+     * Master Render Pipeline
      */
     draw(worldDistance) {
         const now = performance.now();
@@ -536,19 +530,19 @@ class ParallaxBackground {
         // ১. আকাশ
         this.drawSky();
 
-        // ২. মেঘ (পাহাড়ের পেছনে ভেসে বেড়াবে)
+        // ২. মেঘ
         this.drawClouds(worldDistance, deltaTime);
 
-        // ৩. পাহাড় (Solid 1.0 Opacity - মেঘ স্বাভাবিকভাবে ঢাকবে)
+        // ৩. পাহাড়
         this.drawMountains(worldDistance);
 
         // ৪. মাটির রাস্তা
         this.groundLoaded && this.drawGround(worldDistance);
 
-        // ৫. গাছ, ঝোপ ও ফুল (Depth Sorted)
+        // ৫. গাছ, ঝোপ ও ফুল (Solid Color Depth Blur)
         this.drawGroundElements(worldDistance);
 
-        // ৬. ফ্রন্ট ক্যামেরা ওভারলে
+        // ৬. ফ্রন্ট ক্যামেরা ওভারলে (Solid Blurred Overlay)
         this.drawBottomOverlay(worldDistance);
     }
 }

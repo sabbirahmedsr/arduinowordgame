@@ -1,0 +1,58 @@
+{
+  "basePath": "./image/",
+  "environment": {
+    "bush": [
+      "environment/bush/bush_01.webp",
+      "environment/bush/bush_02.webp",
+      "environment/bush/bush_03.webp",
+      "environment/bush/bush_04.webp",
+      "environment/bush/bush_05.webp",
+      "environment/bush/bush_06.webp",
+      "environment/bush/bush_07.webp",
+      "environment/bush/bush_Atlas.webp"
+    ],
+    "cloud": [
+      "environment/cloud/cloud_01.webp",
+      "environment/cloud/cloud_02.webp",
+      "environment/cloud/cloud_03.webp",
+      "environment/cloud/cloud_04.webp"
+    ],
+    "flower": [
+      "environment/flower/flower_01.webp",
+      "environment/flower/flower_02.webp",
+      "environment/flower/flower_03.webp",
+      "environment/flower/flower_04.webp",
+      "environment/flower/flower_Atlas.webp"
+    ],
+    "ground": {
+      "v3": "environment/ground/ground_v3.webp"
+    },
+    "mountain": [
+      "environment/mountain/mountain_01.webp",
+      "environment/mountain/mountain_02.webp"
+    ],
+    "obstacle": [
+      "environment/obstacle/obstacle_01.webp",
+      "environment/obstacle/obstacle_02.webp",
+      "environment/obstacle/obstacle_03.webp",
+      "environment/obstacle/obstacle_04.webp"
+    ],
+    "tree": {
+      "bg": [
+        "environment/tree/tree_bg_01.webp",
+        "environment/tree/tree_bg_02.webp",
+        "environment/tree/tree_bg_03.webp"
+      ],
+      "fg": [
+        "environment/tree/tree_fg_01.webp",
+        "environment/tree/tree_fg_02.webp",
+        "environment/tree/tree_fg_03.webp",
+        "environment/tree/tree_fg_04.webp"
+      ]
+    }
+  },
+  "player": {
+    "idle": "player/Hero_Idle.webp",
+    "running": "player/Hero_Running.webp"
+  }
+}

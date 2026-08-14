@@ -1,7 +1,9 @@
 /* *********************************************************
    Module 1.0.0 : Core Game Engine
    Description: Coordinates game state, inputs, level data loading,
-   hero movement, obstacle badges, and parallax background rendering.
+   scaled hero movement without speed particles, obstacle badges 
+   positioned at 30% screen height, dynamic asset loading, and 
+   aspect-ratio preserved rendering.
 ************************************************************/
 
 class GameEngine {
@@ -12,6 +14,8 @@ class GameEngine {
         this.ui = new UIController();
         this.particles = new ParticleSystem();
         this.parallax = new ParallaxBackground(this.canvas, this.ctx);
+        
+        this.assets = new AssetManager();
 
         this.serial = new SerialController(
             (letter) => this.handleLetterInput(letter),
@@ -27,15 +31,15 @@ class GameEngine {
         this.worldDistance = 0;
         this.isWaitingAtObstacle = false;
 
-        this.hero = { x: 150, y: 0, width: 55, height: 75, speed: GameConfig.heroSpeed };
+        this.levelObstacleImages = [];
+
+        // Enlarged Hero initial bounds
+        this.hero = { x: 150, y: 0, width: 190, height: 270, speed: GameConfig.heroSpeed };
 
         this.handleResize();
         this.bindEvents();
     }
 
-    /**
-     * JSON ফাইল থেকে সরাসরি ওয়ার্ডস লোড করা
-     */
     async loadLevelData() {
         try {
             const response = await fetch('./data/levelData.json');
@@ -43,14 +47,11 @@ class GameEngine {
             this.words = data.words || ["CAT"];
         } catch (error) {
             console.error("Failed to load levelData.json:", error);
-            this.words = ["CAT", "DOG", "SUN"]; // Fallback words
+            this.words = ["CAT", "DOG", "SUN"];
         }
         this.currentWord = this.words[this.currentWordIndex];
     }
 
-    /**
-     * পরবর্তী শব্দে যাওয়া
-     */
     nextWord() {
         if (this.words.length > 0) {
             this.currentWordIndex = (this.currentWordIndex + 1) % this.words.length;
@@ -63,12 +64,11 @@ class GameEngine {
         this.canvas.height = window.innerHeight;
         this.travelDistancePerObstacle = this.canvas.width * GameConfig.travelDistanceMultiplier;
         
-        // গ্রাউন্ড Y পজিশন চওড়া ট্র্যাকের সাথে অ্যাডজাস্ট করা হলো
-        this.groundY = this.canvas.height * 0.62; 
+        this.groundY = this.canvas.height * 0.7; 
         
-        this.hero.height = 100;
-        this.hero.width = 75;
-        // ক্যারেক্টারকে চওড়া ট্র্যাকের সামান্য ভেতরে সেট করা হলো
+        // Hero dimensions resized for higher visibility
+        this.hero.height = 270;
+        this.hero.width = 190;
         this.hero.y = this.groundY - this.hero.height + 15; 
     }
 
@@ -78,16 +78,31 @@ class GameEngine {
         this.isWaitingAtObstacle = false;
         this.targetObstacleDistance = this.travelDistancePerObstacle;
 
-        // ১. লেভেলের প্রতিটি লেটারের World X পজিশন বের করা
+        // 1. Fetch obstacle list dynamically from resources.json
+        const availableObstacles = this.assets.config?.environment?.obstacle || [];
+        this.levelObstacleImages = [];
+        let previousIndex = -1;
+
+        for (let i = 0; i < this.currentWord.length; i++) {
+            if (availableObstacles.length === 0) break;
+
+            let randomIndex;
+            do {
+                randomIndex = Math.floor(Math.random() * availableObstacles.length);
+            } while (randomIndex === previousIndex && availableObstacles.length > 1);
+
+            previousIndex = randomIndex;
+            this.levelObstacleImages.push(availableObstacles[randomIndex]);
+        }
+
+        // 2. Calculate World X positions for obstacles
         const obstaclePositions = [];
         for (let i = 0; i < this.currentWord.length; i++) {
             const obsWorldX = ((i + 1) * this.travelDistancePerObstacle) + (this.canvas.width / 2);
             obstaclePositions.push(obsWorldX);
         }
 
-        // ২. প্যারালাক্স ব্যাকগ্রাউন্ডকে জিরো-স্পন ডেনসিটি জোনে গাছ স্পন করতে বলা
         this.parallax.generateLevelTrees(obstaclePositions);
-
         this.ui.setupWordDisplay(this.currentWord);
     }
 
@@ -154,7 +169,6 @@ class GameEngine {
     update() {
         if (!this.isWaitingAtObstacle) {
             this.worldDistance += this.hero.speed;
-            this.particles.spawnSpeedTrail(this.hero.x, this.hero.y, this.hero.height);
 
             if (this.worldDistance >= this.targetObstacleDistance) {
                 this.isWaitingAtObstacle = true;
@@ -174,29 +188,38 @@ class GameEngine {
         if (screenX > -200 && screenX < this.canvas.width + 200) {
             this.ctx.save();
 
-            const obstacleWidth = 120;
-            const obstacleHeight = 130;
-            const obstacleY = this.groundY - obstacleHeight + 10;
+            // Retrieve loaded image from AssetManager
+            const currentObstaclePath = this.levelObstacleImages[this.currentLetterIndex];
+            const obstacleImg = currentObstaclePath ? this.assets.get(currentObstaclePath) : null;
 
-            // ১. অবস্ট্যাকল ইলিমেন্ট
-            if (this.isWaitingAtObstacle) {
-                this.ctx.shadowColor = '#facc15';
-                this.ctx.shadowBlur = 20;
-                this.ctx.fillStyle = '#3b82f6'; 
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, obstacleY + 60, 50, 0, Math.PI * 2);
-                this.ctx.fill();
-            } else {
-                this.ctx.shadowBlur = 0;
-                this.ctx.fillStyle = '#64748b';
-                this.ctx.beginPath();
-                this.ctx.arc(screenX, obstacleY + 60, 50, 0, Math.PI * 2);
-                this.ctx.fill();
+            let targetHeight = 155; 
+            let targetWidth = 140;
+
+            // Dynamic aspect ratio calculation to prevent stretching
+            if (obstacleImg && obstacleImg.naturalHeight !== 0) {
+                const aspectRatio = obstacleImg.naturalWidth / obstacleImg.naturalHeight;
+                targetWidth = targetHeight * aspectRatio;
             }
 
-            // ২. স্ট্যান্ড-আউট চ্যালেঞ্জ লেটার ব্যাজ
+            const obstacleY = this.groundY - targetHeight + 12;
+
+            if (obstacleImg) {
+                if (this.isWaitingAtObstacle) {
+                    this.ctx.shadowColor = '#facc15';
+                    this.ctx.shadowBlur = 20;
+                }
+                this.ctx.drawImage(
+                    obstacleImg,
+                    screenX - (targetWidth / 2),
+                    obstacleY,
+                    targetWidth,
+                    targetHeight
+                );
+            }
+
+            // Challenge Letter Badge centered at ~30% from top of screen
             if (this.isWaitingAtObstacle) {
-                const badgeY = obstacleY - 140; 
+                const badgeY = this.canvas.height * 0.30; 
                 const pulse = Math.sin(Date.now() / 150) * 6;
                 const radius = 70 + pulse;
 
@@ -236,30 +259,28 @@ class GameEngine {
     }
 
     drawHero() {
-        this.hero.y = this.groundY - this.hero.height;
+        const playerConfig = this.assets.config?.player;
+        const heroPath = this.isWaitingAtObstacle ? playerConfig?.idle : playerConfig?.running;
+        const img = heroPath ? this.assets.get(heroPath) : null;
+
+        // Scaled hero height and width
+        let targetHeight = 270;
+        let targetWidth = 190;
+
+        if (img && img.naturalHeight !== 0) {
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            targetWidth = targetHeight * aspectRatio;
+        }
+
+        this.hero.width = targetWidth;
+        this.hero.height = targetHeight;
+        this.hero.y = this.groundY - targetHeight + 15;
 
         this.ctx.save();
 
-        const centerX = this.hero.x + (this.hero.width / 2);
-        const centerY = this.hero.y + (this.hero.height / 2);
-
-        this.ctx.translate(centerX, centerY);
-
-        if (!this.isWaitingAtObstacle) {
-            const leanAngle = 10 * (Math.PI / 180);
-            this.ctx.rotate(leanAngle);
+        if (img) {
+            this.ctx.drawImage(img, this.hero.x, this.hero.y, targetWidth, targetHeight);
         }
-
-        const halfW = this.hero.width / 2;
-        const halfH = this.hero.height / 2;
-
-        this.ctx.fillStyle = '#38bdf8';
-        this.ctx.fillRect(-halfW, -halfH, this.hero.width, this.hero.height);
-
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.fillRect(-halfW + 32, -halfH + 14, 14, 14);
-        this.ctx.fillStyle = '#0f172a';
-        this.ctx.fillRect(-halfW + 38, -halfH + 17, 6, 6);
 
         this.ctx.restore();
     }
@@ -267,7 +288,6 @@ class GameEngine {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // worldDistance পাস করা হচ্ছে
         this.parallax.draw(this.worldDistance);
 
         this.drawObstacle();
@@ -282,8 +302,9 @@ class GameEngine {
     }
 
     async start() {
+        await this.assets.loadResources('./data/resources.json');
         await this.loadLevelData();
-        await this.parallax.init(); // প্যারালাক্স কনফিগ পুরোপুরি লোড হওয়া নিশ্চিতকরণ
+        await this.parallax.init();
         this.initLevel();
         this.loop();
     }
