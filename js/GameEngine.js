@@ -1,3 +1,9 @@
+/* *********************************************************
+   Module 1.0.0 : Core Game Engine
+   Description: Coordinates game state, inputs, level data loading,
+   hero movement, obstacle badges, and parallax background rendering.
+************************************************************/
+
 class GameEngine {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -28,7 +34,7 @@ class GameEngine {
     }
 
     /**
-     * JSON ফাইল থেকে সরাসরি ওয়ার্ডস লোড করা
+     * JSON ফাইল থেকে সরাসরি ওয়ার্ডস লোড করা
      */
     async loadLevelData() {
         try {
@@ -43,7 +49,7 @@ class GameEngine {
     }
 
     /**
-     * পরবর্তী শব্দে যাওয়া
+     * পরবর্তী শব্দে যাওয়া
      */
     nextWord() {
         if (this.words.length > 0) {
@@ -57,12 +63,12 @@ class GameEngine {
         this.canvas.height = window.innerHeight;
         this.travelDistancePerObstacle = this.canvas.width * GameConfig.travelDistanceMultiplier;
         
-        // গ্রাউন্ড Y পজিশন চওড়া ট্র্যাকের সাথে অ্যাডজাস্ট করা হলো
+        // গ্রাউন্ড Y পজিশন চওড়া ট্র্যাকের সাথে অ্যাডজাস্ট করা হলো
         this.groundY = this.canvas.height * 0.62; 
         
         this.hero.height = 100;
         this.hero.width = 75;
-        // ক্যারেক্টারকে চওড়া ট্র্যাকের সামান্য ভেতরে সেট করা হলো
+        // ক্যারেক্টারকে চওড়া ট্র্যাকের সামান্য ভেতরে সেট করা হলো
         this.hero.y = this.groundY - this.hero.height + 15; 
     }
 
@@ -72,13 +78,15 @@ class GameEngine {
         this.isWaitingAtObstacle = false;
         this.targetObstacleDistance = this.travelDistancePerObstacle;
 
-        // প্রতিটি লেটারের জন্য র্যান্ডম অবস্ট্যাকল টাইপ জেনারেট করা
-        const obstacleTypes = ['gate', 'river', 'rock'];
-        this.currentObstacles = [];
+        // ১. লেভেলের প্রতিটি লেটারের World X পজিশন বের করা
+        const obstaclePositions = [];
         for (let i = 0; i < this.currentWord.length; i++) {
-            const randomType = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
-            this.currentObstacles.push({ type: randomType });
+            const obsWorldX = ((i + 1) * this.travelDistancePerObstacle) + (this.canvas.width / 2);
+            obstaclePositions.push(obsWorldX);
         }
+
+        // ২. প্যারালাক্স ব্যাকগ্রাউন্ডকে জিরো-স্পন ডেনসিটি জোনে গাছ স্পন করতে বলা
+        this.parallax.generateLevelTrees(obstaclePositions);
 
         this.ui.setupWordDisplay(this.currentWord);
     }
@@ -136,7 +144,7 @@ class GameEngine {
         if (this.currentLetterIndex >= this.currentWord.length) {
             setTimeout(() => {
                 this.ui.showCompletionPopup(this.currentWord, () => {
-                    this.nextWord(); // GameEngine এর ভেতরের nextWord মেথড কল হবে
+                    this.nextWord();
                     this.initLevel();
                 });
             }, 600);
@@ -166,15 +174,12 @@ class GameEngine {
         if (screenX > -200 && screenX < this.canvas.width + 200) {
             this.ctx.save();
 
-            // অবস্ট্যাকল পজিশনিং রেফারেন্স
             const obstacleWidth = 120;
             const obstacleHeight = 130;
-            const obstacleX = screenX - (obstacleWidth / 2);
             const obstacleY = this.groundY - obstacleHeight + 10;
 
-            // 🌟 ১. অবস্ট্যাকল রেন্ডারিং (এখানে ভবিষ্যতে direct Image drawImage হবে)
+            // ১. অবস্ট্যাকল ইলিমেন্ট
             if (this.isWaitingAtObstacle) {
-                // ইমেজ আসার আগ পর্যন্ত সাময়িক সফট ডেমো ইলিমেন্ট
                 this.ctx.shadowColor = '#facc15';
                 this.ctx.shadowBlur = 20;
                 this.ctx.fillStyle = '#3b82f6'; 
@@ -189,27 +194,22 @@ class GameEngine {
                 this.ctx.fill();
             }
 
-            // 🌟 স্ট্যান্ড-আউট চ্যালেঞ্জ লেটার ব্যাজ (Vibrant Sunshine Pop Badge)
+            // ২. স্ট্যান্ড-আউট চ্যালেঞ্জ লেটার ব্যাজ
             if (this.isWaitingAtObstacle) {
-                // ১. ব্যাজটিকে আরও বেশ খানিকটা ওপরে নীল আকাশের মাঝে তুলে দেওয়া হলো
                 const badgeY = obstacleY - 140; 
-
-                // ২. ব্যাজের রেডিয়াস আরও একটু বাড়ানো হলো
                 const pulse = Math.sin(Date.now() / 150) * 6;
                 const radius = 70 + pulse;
 
-                // ৩. ড্রপ শ্যাডো ও উজ্জ্বল আউটডোর গ্লো (Golden Sunshine Glow)
                 this.ctx.shadowColor = '#f59e0b';
                 this.ctx.shadowBlur = 30;
                 
-                // ৪. ব্যাকগ্রাউন্ড: উজ্জ্বল গোল্ডেন/সাদা থ্রিডি সার্কেল (ডার্ক নয়, হাই কনট্রাস্ট!)
                 const badgeGrad = this.ctx.createLinearGradient(0, badgeY - radius, 0, badgeY + radius);
-                badgeGrad.addColorStop(0, '#ffffff');  // ওপরে ক্রিস্প হোয়াইট
-                badgeGrad.addColorStop(0.3, '#fef08a'); // হালকা ইয়েলো
-                badgeGrad.addColorStop(1, '#fde047');  // সানি ইয়োলো
+                badgeGrad.addColorStop(0, '#ffffff');  
+                badgeGrad.addColorStop(0.3, '#fef08a'); 
+                badgeGrad.addColorStop(1, '#fde047');  
 
                 this.ctx.fillStyle = badgeGrad;
-                this.ctx.strokeStyle = '#f59e0b'; // ওয়ার্ম অরেঞ্জ বর্ডার
+                this.ctx.strokeStyle = '#f59e0b'; 
                 this.ctx.lineWidth = 7;
 
                 this.ctx.beginPath();
@@ -217,7 +217,6 @@ class GameEngine {
                 this.ctx.fill();
                 this.ctx.stroke();
 
-                // 🖐️ ৫. ইনার রিং (3D Depth ফিল দেওয়ার জন্য)
                 this.ctx.shadowBlur = 0;
                 this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
                 this.ctx.lineWidth = 3;
@@ -225,14 +224,12 @@ class GameEngine {
                 this.ctx.arc(screenX, badgeY, radius - 8, 0, Math.PI * 2);
                 this.ctx.stroke();
 
-                // 🔤 ৬. লেটার টেক্সট (বোল্ড অ্যান্ড ডার্ক চকোলেট/ব্রাউন - যেন সাদা/হলুদে ১০০০% স্পষ্ট ফুট ওঠে)
                 this.ctx.fillStyle = '#78350f'; 
                 this.ctx.font = '900 78px "Arial Black", sans-serif';
                 this.ctx.textAlign = 'center';
                 this.ctx.textBaseline = 'middle';
                 this.ctx.fillText(requiredLetter, screenX, badgeY + 4);
             }
-
 
             this.ctx.restore();
         }
@@ -243,28 +240,22 @@ class GameEngine {
 
         this.ctx.save();
 
-        // ১. ক্যারেক্টারের সেন্টার পিভট হিসাব করা
         const centerX = this.hero.x + (this.hero.width / 2);
         const centerY = this.hero.y + (this.hero.height / 2);
 
-        // ২. ট্রান্সলেট ক্যানভাস
         this.ctx.translate(centerX, centerY);
 
-        // 🏃‍♂️ ৩. অবস্ট্যাকলে না থামা পর্যন্ত প্লেয়ার সবসময় সামনের দিকে ১০ ডিগ্রি হেলে থাকবে
         if (!this.isWaitingAtObstacle) {
-            const leanAngle = 10 * (Math.PI / 180); // ১০ ডিগ্রি
+            const leanAngle = 10 * (Math.PI / 180);
             this.ctx.rotate(leanAngle);
         }
 
-        // ৪. ক্যারেক্টার আঁকা (সেন্টার পিভট হিসাব অনুযায়ী)
         const halfW = this.hero.width / 2;
         const halfH = this.hero.height / 2;
 
-        // বডি (ব্লু ব্লক)
         this.ctx.fillStyle = '#38bdf8';
         this.ctx.fillRect(-halfW, -halfH, this.hero.width, this.hero.height);
 
-        // চোখ
         this.ctx.fillStyle = '#ffffff';
         this.ctx.fillRect(-halfW + 32, -halfH + 14, 14, 14);
         this.ctx.fillStyle = '#0f172a';
@@ -275,6 +266,8 @@ class GameEngine {
 
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // worldDistance পাস করা হচ্ছে
         this.parallax.draw(this.worldDistance);
 
         this.drawObstacle();
@@ -289,7 +282,8 @@ class GameEngine {
     }
 
     async start() {
-        await this.loadLevelData(); // JSON ডাটা না আসা পর্যন্ত অপেক্ষা করবে
+        await this.loadLevelData();
+        await this.parallax.init(); // প্যারালাক্স কনফিগ পুরোপুরি লোড হওয়া নিশ্চিতকরণ
         this.initLevel();
         this.loop();
     }

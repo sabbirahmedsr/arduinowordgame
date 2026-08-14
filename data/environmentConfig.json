@@ -1,0 +1,97 @@
+{
+  "groundImagePath": "image/environment/ground/ground_v3.webp",
+  "bgTrees": [
+    "image/environment/tree/tree_bg_01.webp",
+    "image/environment/tree/tree_bg_02.webp",
+    "image/environment/tree/tree_bg_03.webp"
+  ],
+  "fgTrees": [
+    "image/environment/tree/tree_fg_01.webp",
+    "image/environment/tree/tree_fg_02.webp",
+    "image/environment/tree/tree_fg_03.webp",
+    "image/environment/tree/tree_fg_04.webp"
+  ],
+  "bushes": [
+    "image/environment/bush/bush_01.webp",
+    "image/environment/bush/bush_02.webp",
+    "image/environment/bush/bush_03.webp",
+    "image/environment/bush/bush_04.webp",
+    "image/environment/bush/bush_05.webp",
+    "image/environment/bush/bush_06.webp",
+    "image/environment/bush/bush_07.webp"
+  ],
+  "flowers": [
+    "image/environment/flower/flower_01.webp",
+    "image/environment/flower/flower_02.webp",
+    "image/environment/flower/flower_03.webp",
+    "image/environment/flower/flower_04.webp"
+  ],
+  "mountains": [
+    "image/environment/mountain/mountain_02.webp",
+    "image/environment/mountain/mountain_01.webp"
+  ],
+  "clouds": [
+    "image/environment/cloud/cloud_01.webp",
+    "image/environment/cloud/cloud_02.webp",
+    "image/environment/cloud/cloud_03.webp",
+    "image/environment/cloud/cloud_04.webp"
+  ],
+  "mountainSettings": {
+    "speed": 0.20,
+    "topYRatio": 0.22,
+    "heightRatio": 0.32,
+    "opacity": 1.0
+  },
+  "cloudSettings": {
+    "count": 5,
+    "minSpeed": 12,
+    "maxSpeed": 30,
+    "parallaxFactor": 0.08,
+    "minTopYRatio": 0.02,
+    "maxTopYRatio": 0.12,
+    "minScale": 0.2,
+    "maxScale": 0.6,
+    "floatAmplitude": 6,
+    "floatSpeed": 1.2
+  },
+  "treeZone": {
+    "bgZoneRatio": { "min": 0.4375, "max": 0.5000 },
+    "fgZoneRatio": { "min": 0.3750, "max": 0.4375 },
+    "bgTreeSettings": {
+      "minScale": 0.50,
+      "maxScale": 0.65,
+      "density": 1.0
+    },
+    "fgTreeSettings": {
+      "minScale": 0.80,
+      "maxScale": 1.05,
+      "density": 0.8
+    }
+  },
+  "foliageZone": {
+    "fullZoneRatio": { "min": 0.3750, "max": 0.5000 },
+    "minScale": 0.55,
+    "maxScale": 0.85,
+    "bushDensity": 1.2,
+    "flowerDensity": 0.5
+  },
+  "depthVisuals": {
+    "minBlur": 0.0,
+    "maxBlur": 2.0,
+    "minOpacity": 0.70,
+    "maxOpacity": 1.0
+  },
+  "bottomOverlaySettings": {
+    "minScale": 1.10,
+    "maxScale": 1.60,
+    "minOpacity": 0.95,
+    "maxOpacity": 1.0,
+    "bushDensity": 0.60,
+    "flowerDensity": 1.40,
+    "speed": 1.30,
+    "blur": 3,
+    "brightness": 0.65,
+    "minYOffset": -15,
+    "maxYOffset": 30
+  }
+}
