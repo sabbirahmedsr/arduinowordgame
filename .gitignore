@@ -1,0 +1,14 @@
+# Arduino build outputs
+/build/
+*.hex
+*.elf
+
+# VS Code directory (Local configurations)
+.vscode/
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/c_cpp_properties.json
+
+# OS specific files
+.DS_Store
+Thumbs.db

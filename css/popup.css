@@ -1,0 +1,47 @@
+#popup-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+#popup-overlay.hidden {
+    display: none;
+}
+
+.popup-card {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 2px solid #38bdf8;
+    border-radius: 24px;
+    padding: 40px 60px;
+    text-align: center;
+    color: #ffffff;
+}
+
+/* 🔹 নতুন যোগ করা হয়েছে: টাইটেলের নিচে সামান্য ফাঁকা */
+.popup-card h2 {
+    margin-bottom: 8px;
+}
+
+/* 🔹 নতুন যোগ করা হয়েছে: লেখার নিচে ফাঁকা জায়গা তৈরি করবে, যেন বাটনে না চাপে */
+.popup-card p {
+    margin-bottom: 24px;
+}
+
+.popup-card button {
+    background: #22c55e;
+    color: #ffffff;
+    border: none;
+    padding: 14px 36px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 14px;
+    cursor: pointer;
+}

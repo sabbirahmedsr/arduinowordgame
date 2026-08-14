@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Quest - Minimal Bottom UI</title>
+    
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/hud.css">
+    <link rel="stylesheet" href="css/popup.css">
+</head>
+<body>
+
+    <!-- Fullscreen Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Top Word HUD -->
+    <div id="word-ui-container"></div>
+
+    <!-- Bottom Center Arduino Controller HUD -->
+    <div class="serial-hud-container">
+        <!-- Top Row: Decimal, Connect, Letter -->
+        <div class="hud-top-row">
+            <div class="stat-square-box">
+                <span class="square-val" id="hud-decimal-val">0</span>
+            </div>
+            
+            <button id="connect-serial-btn" class="disconnected">
+                🔌 No Connection
+            </button>
+
+            <div class="stat-square-box highlight">
+                <span class="square-val" id="hud-letter-val">?</span>
+            </div>
+        </div>
+
+        <!-- Bottom Row: 8 Bit Cells -->
+        <div class="bit-cells-container" id="hud-bit-cells">
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+            <div class="bit-cell bit-0">0</div>
+        </div>
+    </div>
+
+    
+    <!-- Level Complete Popup -->
+    <div id="popup-overlay" class="hidden">
+        <div class="popup-card">
+            <h2 id="popup-title">Awesome!</h2>
+            <p id="popup-message">You completed the word!</p>
+            <button id="next-level-btn">Next Level</button>
+        </div>
+    </div>
+
+    <!-- JS Scripts -->
+    <script src="js/GameConfig.js"></script>
+    <script src="js/SerialController.js"></script>
+    <script src="js/ParticleSystem.js"></script>
+    <script src="js/UIController.js"></script>
+    <script src="js/ParallaxBackground.js"></script>
+    <script src="js/GameEngine.js"></script>
+</body>
+</html>
