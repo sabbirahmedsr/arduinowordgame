@@ -1,20 +1,16 @@
 /* *********************************************************
    Module 1.21.0 : Fully Opaque Foliage Engine (No Opacity Bleed)
-   Description: Removes alpha/opacity handling from tree, bush, and foliage rendering.
-   All ground and overlay elements are drawn completely solid (opacity 1.0) to prevent
-   unwanted x-ray visibility of mountains and background layers through objects.
+   Description: Uses shared AssetManager resources and optimized config.
 ************************************************************/
 
 class ParallaxBackground {
-    constructor(canvas, ctx) {
+    constructor(canvas, ctx, assetManager) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.assets = assetManager;
 
-        // Ground Asset Setup
-        this.groundImg = new Image();
-        this.groundLoaded = false;
-        
-        // Preloaded Asset collections
+        // Assets Reference Collections
+        this.groundImg = null;
         this.treeAssets = { bg: [], fg: [] };
         this.bushAssets = [];
         this.flowerAssets = [];
@@ -22,66 +18,40 @@ class ParallaxBackground {
         this.cloudAssets = [];
         this.config = null;
 
-        // Unified Ground Elements Collection
+        // Dynamic Elements Collections
         this.groundElements = []; 
-
-        // Dynamic Cloud Objects Pool
         this.activeClouds = [];
-
-        // Foreground Camera Overlay
         this.spawnedBottomOverlay = { flowers: [], bushes: [] };
 
         this.isConfigLoaded = false;
         this.pendingObstaclePositions = null;
-
-        // Time tracking for floating noise
         this.lastTime = performance.now();
     }
 
-    /**
-     * Async initialization entry point
-     */
     async init() {
         await this.loadEnvironmentConfig();
     }
 
-    /**
-     * Preloads all image resources
-     */
     async loadEnvironmentConfig() {
         try {
             const response = await fetch('./data/environmentConfig.json');
             this.config = await response.json();
 
-            // Ground Image Load
-            this.groundImg.onload = () => { this.groundLoaded = true; };
-            this.groundImg.src = this.config.groundImagePath || 'image/environment/ground/ground_v3.webp';
+            // Populate asset references directly from AssetManager
+            const env = this.assets.config?.environment || {};
 
-            const bgPromises = (this.config.bgTrees || []).map(src => this.loadImagePromise(src));
-            const fgPromises = (this.config.fgTrees || []).map(src => this.loadImagePromise(src));
-            const bushPromises = (this.config.bushes || []).map(src => this.loadImagePromise(src));
-            const flowerPromises = (this.config.flowers || []).map(src => this.loadImagePromise(src));
-            const mountainPromises = (this.config.mountains || []).map(src => this.loadImagePromise(src));
-            const cloudPromises = (this.config.clouds || []).map(src => this.loadImagePromise(src));
+            if (env.ground?.v3) {
+                this.groundImg = this.assets.get(env.ground.v3);
+            }
 
-            const [loadedBg, loadedFg, loadedBushes, loadedFlowers, loadedMountains, loadedClouds] = await Promise.all([
-                Promise.all(bgPromises),
-                Promise.all(fgPromises),
-                Promise.all(bushPromises),
-                Promise.all(flowerPromises),
-                Promise.all(mountainPromises),
-                Promise.all(cloudPromises)
-            ]);
-
-            this.treeAssets.bg = loadedBg.filter(img => img !== null);
-            this.treeAssets.fg = loadedFg.filter(img => img !== null);
-            this.bushAssets = loadedBushes.filter(img => img !== null);
-            this.flowerAssets = loadedFlowers.filter(img => img !== null);
-            this.mountainAssets = loadedMountains.filter(img => img !== null);
-            this.cloudAssets = loadedClouds.filter(img => img !== null);
+            this.treeAssets.bg = (env.tree?.bg || []).map(path => this.assets.get(path)).filter(Boolean);
+            this.treeAssets.fg = (env.tree?.fg || []).map(path => this.assets.get(path)).filter(Boolean);
+            this.bushAssets = (env.bush || []).map(path => this.assets.get(path)).filter(Boolean);
+            this.flowerAssets = (env.flower || []).map(path => this.assets.get(path)).filter(Boolean);
+            this.mountainAssets = (env.mountain || []).map(path => this.assets.get(path)).filter(Boolean);
+            this.cloudAssets = (env.cloud || []).map(path => this.assets.get(path)).filter(Boolean);
 
             this.initCloudSystem();
-
             this.isConfigLoaded = true;
 
             if (this.pendingObstaclePositions) {
@@ -92,24 +62,12 @@ class ParallaxBackground {
         }
     }
 
-    loadImagePromise(src) {
-        return new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(null);
-            img.src = src;
-        });
-    }
-
     getRandomRange(min, max) {
         return min + Math.random() * (max - min);
     }
 
-    /**
-     * Segmented Grid Spacing system prevents clouds from clustering together
-     */
     initCloudSystem() {
-        if (this.cloudAssets.length === 0 || !this.config.cloudSettings) return;
+        if (this.cloudAssets.length === 0 || !this.config?.cloudSettings) return;
 
         const conf = this.config.cloudSettings;
         const count = conf.count || 5;
@@ -137,9 +95,6 @@ class ParallaxBackground {
         }
     }
 
-    /**
-     * Measures safe zone distance for dynamic tree clearings
-     */
     getSafeZoneDistance(currentX, obstaclePositions, speed) {
         const screenCenter = this.canvas.width / 2;
         let minDistance = Infinity;
@@ -154,9 +109,6 @@ class ParallaxBackground {
         return minDistance;
     }
 
-    /**
-     * Generates environment elements extending past the final letter step
-     */
     generateLevelTrees(obstaclePositions) {
         this.pendingObstaclePositions = obstaclePositions;
 
@@ -170,15 +122,12 @@ class ParallaxBackground {
         const strictSafeRadius = 400; 
         const startX = 100;
         const lastObstacleX = obstaclePositions[obstaclePositions.length - 1];
-        
         const endX = lastObstacleX + 3500;
 
         const treeConf = this.config.treeZone;
         const foliageConf = this.config.foliageZone;
 
-        // =========================================
-        // ১. ব্যাকগ্রাউন্ড ট্রি স্পনিং
-        // =========================================
+        // 1. Background Trees
         if (this.treeAssets.bg.length > 0 && treeConf) {
             const settings = treeConf.bgTreeSettings;
             let currentX = startX;
@@ -194,20 +143,12 @@ class ParallaxBackground {
                 const scale = this.getRandomRange(settings.minScale, settings.maxScale);
                 const bottomRatio = this.getRandomRange(treeConf.bgZoneRatio.min, treeConf.bgZoneRatio.max);
 
-                this.groundElements.push({
-                    x: currentX,
-                    img: img,
-                    scale: scale,
-                    bottomRatio: bottomRatio
-                });
-
+                this.groundElements.push({ x: currentX, img, scale, bottomRatio });
                 currentX += baseGap + (Math.random() * 100);
             }
         }
 
-        // =========================================
-        // ২. ফোরগ্রাউন্ড ট্রি স্পনিং
-        // =========================================
+        // 2. Foreground Trees
         if (this.treeAssets.fg.length > 0 && treeConf) {
             const settings = treeConf.fgTreeSettings;
             let currentX = startX + 120;
@@ -223,20 +164,12 @@ class ParallaxBackground {
                 const scale = this.getRandomRange(settings.minScale, settings.maxScale);
                 const bottomRatio = this.getRandomRange(treeConf.fgZoneRatio.min, treeConf.fgZoneRatio.max);
 
-                this.groundElements.push({
-                    x: currentX,
-                    img: img,
-                    scale: scale,
-                    bottomRatio: bottomRatio
-                });
-
+                this.groundElements.push({ x: currentX, img, scale, bottomRatio });
                 currentX += baseGap + (Math.random() * 120);
             }
         }
 
-        // =========================================
-        // ৩. বুশ ও ফ্লাওয়ার স্পনিং
-        // =========================================
+        // 3. Bushes & Flowers
         if (foliageConf) {
             let currentX = startX + 40;
             const combinedDensity = (foliageConf.bushDensity || 1.2) + (foliageConf.flowerDensity || 0.5);
@@ -256,26 +189,17 @@ class ParallaxBackground {
                     const scale = this.getRandomRange(foliageConf.minScale, foliageConf.maxScale);
                     const bottomRatio = this.getRandomRange(foliageConf.fullZoneRatio.min, foliageConf.fullZoneRatio.max);
 
-                    this.groundElements.push({
-                        x: currentX,
-                        img: img,
-                        scale: scale,
-                        bottomRatio: bottomRatio
-                    });
+                    this.groundElements.push({ x: currentX, img, scale, bottomRatio });
                 }
 
                 currentX += baseGap + (Math.random() * 80);
             }
         }
 
-        // =========================================
-        // ৪. PAINTER'S ALGORITHM DEPTH SORTING
-        // =========================================
+        // 4. Depth Sorting
         this.groundElements.sort((a, b) => b.bottomRatio - a.bottomRatio);
 
-        // =========================================
-        // ৫. ক্যামেরা ফ্রন্ট ওভারলে
-        // =========================================
+        // 5. Camera Bottom Overlay
         if (this.config.bottomOverlaySettings) {
             const settings = this.config.bottomOverlaySettings;
             let currentX = startX;
@@ -293,12 +217,7 @@ class ParallaxBackground {
                     const scale = this.getRandomRange(settings.minScale, settings.maxScale);
                     const yOffset = this.getRandomRange(settings.minYOffset || -15, settings.maxYOffset || 30);
 
-                    const item = {
-                        x: currentX,
-                        img: img,
-                        scale: scale,
-                        yOffset: yOffset
-                    };
+                    const item = { x: currentX, img, scale, yOffset };
 
                     if (isFlower) {
                         this.spawnedBottomOverlay.flowers.push(item);
@@ -321,11 +240,8 @@ class ParallaxBackground {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    /**
-     * Clouds Renderer
-     */
     drawClouds(worldDistance, deltaTime) {
-        if (this.activeClouds.length === 0 || !this.config.cloudSettings) return;
+        if (this.activeClouds.length === 0 || !this.config?.cloudSettings) return;
 
         const conf = this.config.cloudSettings;
         const parallaxFactor = conf.parallaxFactor || 0.08;
@@ -335,10 +251,9 @@ class ParallaxBackground {
         const totalSpan = screenWidth + 600;
 
         this.activeClouds.forEach(cloud => {
-            if (!cloud.img || !cloud.img.complete) return;
+            if (!cloud.img) return;
 
             cloud.x += cloud.driftSpeed * deltaTime;
-
             cloud.noisePhase += cloud.noiseSpeed * deltaTime;
             const sineYOffset = Math.sin(cloud.noisePhase) * amplitude;
 
@@ -353,17 +268,14 @@ class ParallaxBackground {
             const drawY = (screenHeight * cloud.baseTopYRatio) + sineYOffset;
 
             this.ctx.save();
-            this.ctx.globalAlpha = 1.0; // Fully solid clouds
+            this.ctx.globalAlpha = 1.0;
             this.ctx.drawImage(cloud.img, wrappedX, drawY, drawWidth, drawHeight);
             this.ctx.restore();
         });
     }
 
-    /**
-     * Opaque Solid Mountain Renderer
-     */
     drawMountains(worldDistance) {
-        if (this.mountainAssets.length === 0 || !this.config.mountainSettings) return;
+        if (this.mountainAssets.length === 0 || !this.config?.mountainSettings) return;
 
         const conf = this.config.mountainSettings;
         const speed = conf.speed || 0.20;
@@ -374,7 +286,7 @@ class ParallaxBackground {
         const mountainHeight = screenHeight * (conf.heightRatio || 0.32);
 
         this.mountainAssets.forEach((img, index) => {
-            if (!img || !img.complete) return;
+            if (!img) return;
 
             const layerSpeed = speed * (1 + index * 0.15); 
             const scale = mountainHeight / img.height;
@@ -383,25 +295,16 @@ class ParallaxBackground {
             const offsetX = (worldDistance * layerSpeed) % drawWidth;
 
             this.ctx.save();
-            this.ctx.globalAlpha = 1.0; // Fully solid mountains
+            this.ctx.globalAlpha = 1.0;
 
             for (let x = -drawWidth; x < screenWidth + drawWidth; x += drawWidth) {
-                this.ctx.drawImage(
-                    img,
-                    x - offsetX,
-                    topY,
-                    drawWidth,
-                    mountainHeight
-                );
+                this.ctx.drawImage(img, x - offsetX, topY, drawWidth, mountainHeight);
             }
 
             this.ctx.restore();
         });
     }
 
-    /**
-     * Unified Ground Track Renderer - Strictly Solid (Opacity = 1.0)
-     */
     drawGroundElements(worldDistance) {
         if (!this.isConfigLoaded || this.groundElements.length === 0) return;
 
@@ -415,18 +318,16 @@ class ParallaxBackground {
 
         this.groundElements.forEach(item => {
             const img = item.img;
-            if (!img || !img.complete) return;
+            if (!img) return;
 
             const screenX = item.x - (worldDistance * speed);
 
             if (screenX > -300 && screenX < screenWidth + 300) {
                 const depthFactor = (item.bottomRatio - minZoneRatio) / (maxZoneRatio - minZoneRatio);
                 const clampedFactor = Math.max(0, Math.min(1, depthFactor));
-
                 const calculatedBlur = depthVis.minBlur + (depthVis.maxBlur - depthVis.minBlur) * clampedFactor;
 
                 this.ctx.save();
-                // অপাসিটি ফিক্স: সম্পূর্ণ নিরেট রেন্ডারিং
                 this.ctx.globalAlpha = 1.0;
 
                 if (calculatedBlur > 0.1) {
@@ -446,9 +347,6 @@ class ParallaxBackground {
         });
     }
 
-    /**
-     * Continuous Camera Foreground Overlay Renderer - Strictly Solid (Opacity = 1.0)
-     */
     drawBottomOverlay(worldDistance) {
         if (!this.isConfigLoaded || !this.config.bottomOverlaySettings) return;
 
@@ -464,7 +362,7 @@ class ParallaxBackground {
 
             itemList.forEach(item => {
                 const img = item.img;
-                if (!img || !img.complete) return;
+                if (!img) return;
 
                 const screenX = item.x - (worldDistance * speed);
 
@@ -474,8 +372,6 @@ class ParallaxBackground {
                     const blurVal = settings.blur || 3;
                     const brightnessVal = settings.brightness || 0.65;
                     this.ctx.filter = `blur(${blurVal}px) brightness(${brightnessVal})`;
-                    
-                    // অপাসিটি ফিক্স: সম্পূর্ণ নিরেট রেন্ডারিং
                     this.ctx.globalAlpha = 1.0;
 
                     const drawWidth = img.width * item.scale;
@@ -491,11 +387,8 @@ class ParallaxBackground {
         });
     }
 
-    /**
-     * Ground Texture Renderer occupying exactly 50% bottom height
-     */
     drawGround(worldDistance) {
-        if (!this.groundLoaded) return;
+        if (!this.groundImg) return;
 
         const screenWidth = this.canvas.width;
         const screenHeight = this.canvas.height;
@@ -509,40 +402,20 @@ class ParallaxBackground {
         const offsetX = (worldDistance * 1.0) % drawWidth;
 
         for (let x = -drawWidth; x < screenWidth + drawWidth; x += drawWidth) {
-            this.ctx.drawImage(
-                this.groundImg,
-                x - offsetX,
-                groundTopY,
-                drawWidth,
-                targetGroundHeight
-            );
+            this.ctx.drawImage(this.groundImg, x - offsetX, groundTopY, drawWidth, targetGroundHeight);
         }
     }
 
-    /**
-     * Master Render Pipeline
-     */
     draw(worldDistance) {
         const now = performance.now();
         const deltaTime = Math.min((now - this.lastTime) / 1000, 0.1); 
         this.lastTime = now;
 
-        // ১. আকাশ
         this.drawSky();
-
-        // ২. মেঘ
         this.drawClouds(worldDistance, deltaTime);
-
-        // ৩. পাহাড়
         this.drawMountains(worldDistance);
-
-        // ৪. মাটির রাস্তা
-        this.groundLoaded && this.drawGround(worldDistance);
-
-        // ৫. গাছ, ঝোপ ও ফুল (Solid Color Depth Blur)
+        this.drawGround(worldDistance);
         this.drawGroundElements(worldDistance);
-
-        // ৬. ফ্রন্ট ক্যামেরা ওভারলে (Solid Blurred Overlay)
         this.drawBottomOverlay(worldDistance);
     }
 }

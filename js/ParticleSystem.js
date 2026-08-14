@@ -1,59 +1,75 @@
+/* *********************************************************
+   Module 1.0.1 : Pure Explosive Particle System
+   Description: Clean Sharp 360-Degree Outward Particle Burst
+************************************************************/
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+
+        // High velocity burst strictly outward in 360 degrees
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 15 + 6;
+
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+
+        // Micro spark sizes
+        this.size = Math.random() * 3 + 2; 
+        this.alpha = 1.0;
+        this.decay = Math.random() * 0.05 + 0.04; 
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        // Decelerate smoothly without gravity drop
+        this.vx *= 0.90; 
+        this.vy *= 0.90;
+        this.alpha -= this.decay;
+    }
+
+    draw(ctx) {
+        if (this.alpha <= 0) return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.fillStyle = this.color;
+        
+        // Minimal subtle glow
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 2;
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 class ParticleSystem {
     constructor() {
         this.particles = [];
     }
 
-    // Explosion particles when clearing obstacle
     spawnExplosion(x, y, color, count = 30) {
         for (let i = 0; i < count; i++) {
-            this.particles.push({
-                x: x,
-                y: y,
-                vx: (Math.random() - 0.5) * 12,
-                vy: (Math.random() - 0.5) * 12,
-                size: Math.random() * 6 + 3,
-                color: color,
-                alpha: 1,
-                decay: 0.025
-            });
+            this.particles.push(new Particle(x, y, color));
         }
-    }
-
-    // Speed boost trail particles behind hero
-    spawnSpeedTrail(heroX, heroY, heroHeight) {
-        this.particles.push({
-            x: heroX - 5,
-            y: heroY + heroHeight / 2 + (Math.random() - 0.5) * (heroHeight * 0.8),
-            vx: -Math.random() * 8 - 4, // Fast backwards stream
-            vy: (Math.random() - 0.5) * 2,
-            size: Math.random() * 4 + 2,
-            color: '#38bdf8', // Speed cyan glow
-            alpha: 0.8,
-            decay: 0.05
-        });
     }
 
     update() {
         for (let i = this.particles.length - 1; i >= 0; i--) {
-            let p = this.particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.alpha -= p.decay;
-            if (p.alpha <= 0) {
+            this.particles[i].update();
+            if (this.particles[i].alpha <= 0) {
                 this.particles.splice(i, 1);
             }
         }
     }
 
     draw(ctx) {
-        ctx.save();
-        this.particles.forEach(p => {
-            ctx.globalAlpha = p.alpha;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.restore();
+        this.particles.forEach(p => p.draw(ctx));
     }
 }

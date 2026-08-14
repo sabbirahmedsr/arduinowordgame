@@ -1,18 +1,22 @@
 class UIController {
     constructor() {
         this.container = document.getElementById('word-ui-container');
-        this.popupOverlay = document.getElementById('popup-overlay');
-        this.nextLevelBtn = document.getElementById('next-level-btn');
         
-        // Serial HUD Elements
-        this.serialDisplay = document.getElementById('serial-data-display');
-        this.serialDecimal = document.getElementById('serial-decimal-display');
-        this.serialLetterPreview = document.getElementById('serial-letter-preview');
+        // Dynamic Victory Image Element
+        this.victoryImgContainer = document.createElement('div');
+        this.victoryImgContainer.id = 'victory-image-container';
+        document.body.appendChild(this.victoryImgContainer);
+
+        // Connect Button Reference
         this.connectBtn = document.getElementById('connect-serial-btn');
     }
 
     setupWordDisplay(word) {
+        this.container.className = ''; 
         this.container.innerHTML = '';
+        this.victoryImgContainer.className = '';
+        this.victoryImgContainer.innerHTML = '';
+
         for (let i = 0; i < word.length; i++) {
             const box = document.createElement('div');
             box.className = 'letter-box';
@@ -29,60 +33,66 @@ class UIController {
         }
     }
 
-    /**
-     * Updates Raw Array (Without Caption), Decimal and Letter Square Badges
-     */
+    triggerColorfulVictory(word, imageSrc, onComplete) {
+        this.container.classList.add('victory-mode');
+
+        const letters = this.container.children;
+        const colorsCount = 5;
+
+        setTimeout(() => {
+            for (let i = 0; i < letters.length; i++) {
+                setTimeout(() => {
+                    const box = letters[i];
+                    if (box) {
+                        box.classList.add(`rainbow-${i % colorsCount}`);
+                        box.classList.add('pop-bounce');
+                    }
+                }, i * 150);
+            }
+
+            const totalLettersTime = letters.length * 150;
+            setTimeout(() => {
+                if (imageSrc) {
+                    this.victoryImgContainer.innerHTML = `<img src="${imageSrc}" alt="${word}" />`;
+                    this.victoryImgContainer.classList.add('show');
+                }
+
+                setTimeout(() => {
+                    if (onComplete) onComplete();
+                }, 1200);
+
+            }, totalLettersTime + 200);
+
+        }, 350);
+    }
+
     updateSerialHUD(bitArray, decimalVal, mappedLetter) {
-        // Update Decimal & Letter values
         const decimalElem = document.getElementById('hud-decimal-val');
         const letterElem = document.getElementById('hud-letter-val');
         
         if (decimalElem) decimalElem.textContent = decimalVal;
         if (letterElem) letterElem.textContent = mappedLetter;
 
-        // Update 8 Square Bit Cells with Color Variation
         const cellsContainer = document.getElementById('hud-bit-cells');
         if (cellsContainer && Array.isArray(bitArray) && bitArray.length === 8) {
             const cells = cellsContainer.children;
-            
             for (let i = 0; i < 8; i++) {
                 const val = bitArray[i];
                 cells[i].textContent = val;
-
-                if (val === 1) {
-                    cells[i].className = 'bit-cell bit-1';
-                } else {
-                    cells[i].className = 'bit-cell bit-0';
-                }
+                cells[i].className = val === 1 ? 'bit-cell bit-1' : 'bit-cell bit-0';
             }
         }
     }
-    /**
-     * Updates Connect / Disconnect button text simply
-     */
+
     setSerialConnectedStatus(isConnected) {
-        const btn = document.getElementById('connect-serial-btn');
-        if (!btn) return;
+        if (!this.connectBtn) return;
 
         if (isConnected) {
-            btn.textContent = '🔌 Connected';
-            btn.className = 'connected'; // Applies Green CSS
+            this.connectBtn.textContent = '🔌 Connected';
+            this.connectBtn.className = 'connected';
         } else {
-            btn.textContent = '🔌 No Connection'; // or '🔌 Connect'
-            btn.className = 'disconnected'; // Applies Red CSS
+            this.connectBtn.textContent = '🔌 No Connection';
+            this.connectBtn.className = 'disconnected';
         }
-    }
-
-    showCompletionPopup(word, onNextCallback) {
-        this.popupOverlay.classList.remove('hidden');
-        
-        const newBtn = this.nextLevelBtn.cloneNode(true);
-        this.nextLevelBtn.parentNode.replaceChild(newBtn, this.nextLevelBtn);
-        this.nextLevelBtn = newBtn;
-
-        this.nextLevelBtn.addEventListener('click', () => {
-            this.popupOverlay.classList.add('hidden');
-            onNextCallback();
-        });
     }
 }

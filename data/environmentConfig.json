@@ -1,41 +1,4 @@
 {
-  "groundImagePath": "image/environment/ground/ground_v3.webp",
-  "bgTrees": [
-    "image/environment/tree/tree_bg_01.webp",
-    "image/environment/tree/tree_bg_02.webp",
-    "image/environment/tree/tree_bg_03.webp"
-  ],
-  "fgTrees": [
-    "image/environment/tree/tree_fg_01.webp",
-    "image/environment/tree/tree_fg_02.webp",
-    "image/environment/tree/tree_fg_03.webp",
-    "image/environment/tree/tree_fg_04.webp"
-  ],
-  "bushes": [
-    "image/environment/bush/bush_01.webp",
-    "image/environment/bush/bush_02.webp",
-    "image/environment/bush/bush_03.webp",
-    "image/environment/bush/bush_04.webp",
-    "image/environment/bush/bush_05.webp",
-    "image/environment/bush/bush_06.webp",
-    "image/environment/bush/bush_07.webp"
-  ],
-  "flowers": [
-    "image/environment/flower/flower_01.webp",
-    "image/environment/flower/flower_02.webp",
-    "image/environment/flower/flower_03.webp",
-    "image/environment/flower/flower_04.webp"
-  ],
-  "mountains": [
-    "image/environment/mountain/mountain_02.webp",
-    "image/environment/mountain/mountain_01.webp"
-  ],
-  "clouds": [
-    "image/environment/cloud/cloud_01.webp",
-    "image/environment/cloud/cloud_02.webp",
-    "image/environment/cloud/cloud_03.webp",
-    "image/environment/cloud/cloud_04.webp"
-  ],
   "mountainSettings": {
     "speed": 0.20,
     "topYRatio": 0.22,

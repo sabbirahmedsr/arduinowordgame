@@ -1,9 +1,6 @@
 /* *********************************************************
    Module 1.0.0 : Core Game Engine
-   Description: Coordinates game state, inputs, level data loading,
-   scaled hero movement without speed particles, obstacle badges 
-   positioned at 30% screen height, dynamic asset loading, and 
-   aspect-ratio preserved rendering.
+   Description: Fixed 1/4th Player Position with Clean Pure Particle Burst
 ************************************************************/
 
 class GameEngine {
@@ -13,16 +10,14 @@ class GameEngine {
         
         this.ui = new UIController();
         this.particles = new ParticleSystem();
-        this.parallax = new ParallaxBackground(this.canvas, this.ctx);
-        
         this.assets = new AssetManager();
+        this.parallax = new ParallaxBackground(this.canvas, this.ctx, this.assets);
 
         this.serial = new SerialController(
             (letter) => this.handleLetterInput(letter),
             (rawData, decimalVal, mappedLetter) => this.ui.updateSerialHUD(rawData, decimalVal, mappedLetter)
         );
 
-        // Word & Level Data State
         this.words = [];
         this.currentWordIndex = 0;
         this.currentWord = "";
@@ -30,11 +25,11 @@ class GameEngine {
         this.currentLetterIndex = 0;
         this.worldDistance = 0;
         this.isWaitingAtObstacle = false;
+        this.isTransitioning = false;
+        this.fadeAlpha = 0;
 
         this.levelObstacleImages = [];
-
-        // Enlarged Hero initial bounds
-        this.hero = { x: 150, y: 0, width: 190, height: 270, speed: GameConfig.heroSpeed };
+        this.hero = { x: 0, y: 0, width: 190, height: 270, speed: GameConfig.heroSpeed };
 
         this.handleResize();
         this.bindEvents();
@@ -49,13 +44,16 @@ class GameEngine {
             console.error("Failed to load levelData.json:", error);
             this.words = ["CAT", "DOG", "SUN"];
         }
-        this.currentWord = this.words[this.currentWordIndex];
+
+        const firstWord = this.words[this.currentWordIndex];
+        this.currentWord = (typeof firstWord === 'object') ? firstWord.word : firstWord;
     }
 
     nextWord() {
         if (this.words.length > 0) {
             this.currentWordIndex = (this.currentWordIndex + 1) % this.words.length;
-            this.currentWord = this.words[this.currentWordIndex];
+            const nextItem = this.words[this.currentWordIndex];
+            this.currentWord = (typeof nextItem === 'object') ? nextItem.word : nextItem;
         }
     }
 
@@ -65,20 +63,22 @@ class GameEngine {
         this.travelDistancePerObstacle = this.canvas.width * GameConfig.travelDistanceMultiplier;
         
         this.groundY = this.canvas.height * 0.7; 
-        
-        // Hero dimensions resized for higher visibility
         this.hero.height = 270;
         this.hero.width = 190;
         this.hero.y = this.groundY - this.hero.height + 15; 
+
+        // Align player's RIGHT EDGE strictly to 1/4th (25%) of screen width
+        const quarterScreenWidth = this.canvas.width * 0.25;
+        this.hero.x = quarterScreenWidth - this.hero.width;
     }
 
     initLevel() {
         this.currentLetterIndex = 0;
         this.worldDistance = 0;
         this.isWaitingAtObstacle = false;
+        this.isTransitioning = false;
         this.targetObstacleDistance = this.travelDistancePerObstacle;
 
-        // 1. Fetch obstacle list dynamically from resources.json
         const availableObstacles = this.assets.config?.environment?.obstacle || [];
         this.levelObstacleImages = [];
         let previousIndex = -1;
@@ -95,7 +95,6 @@ class GameEngine {
             this.levelObstacleImages.push(availableObstacles[randomIndex]);
         }
 
-        // 2. Calculate World X positions for obstacles
         const obstaclePositions = [];
         for (let i = 0; i < this.currentWord.length; i++) {
             const obsWorldX = ((i + 1) * this.travelDistancePerObstacle) + (this.canvas.width / 2);
@@ -140,7 +139,7 @@ class GameEngine {
     }
 
     handleLetterInput(inputLetter) {
-        if (!this.isWaitingAtObstacle) return;
+        if (!this.isWaitingAtObstacle || this.isTransitioning) return;
 
         const targetLetter = this.currentWord[this.currentLetterIndex];
         if (inputLetter === targetLetter) {
@@ -149,7 +148,17 @@ class GameEngine {
     }
 
     handleCorrectInput() {
-        this.particles.spawnExplosion(this.canvas.width / 2, this.hero.y, '#38bdf8', 35);
+        // Active challenge letter badge center coordinate
+        const obstacleWorldX = this.targetObstacleDistance + (this.canvas.width / 2);
+        const screenX = obstacleWorldX - this.worldDistance;
+        const badgeY = this.canvas.height * 0.30;
+
+        // Pure sharp particle explosion in high contrast orange/gold theme
+        this.particles.spawnExplosion(screenX, badgeY, '#ffffff', 25); // Bright white core
+        this.particles.spawnExplosion(screenX, badgeY, '#ff4500', 35); // Vivid orange red
+        this.particles.spawnExplosion(screenX, badgeY, '#ff7700', 30); // Bright neon orange
+        this.particles.spawnExplosion(screenX, badgeY, '#ffd700', 25); // Gold spark
+
         this.ui.revealLetter(this.currentLetterIndex);
 
         this.isWaitingAtObstacle = false;
@@ -157,17 +166,48 @@ class GameEngine {
         this.targetObstacleDistance += this.travelDistancePerObstacle;
 
         if (this.currentLetterIndex >= this.currentWord.length) {
-            setTimeout(() => {
-                this.ui.showCompletionPopup(this.currentWord, () => {
-                    this.nextWord();
-                    this.initLevel();
-                });
-            }, 600);
+            this.triggerAutoTransition();
         }
     }
 
+    triggerAutoTransition() {
+        this.isTransitioning = true;
+
+        const currentWordData = this.words[this.currentWordIndex];
+        const imageSrc = (typeof currentWordData === 'object') ? currentWordData.image : null;
+
+        this.ui.triggerColorfulVictory(this.currentWord, imageSrc, () => {
+            this.startFadeTransition(() => {
+                this.nextWord();
+                this.initLevel();
+            });
+        });
+    }
+
+    startFadeTransition(onMidpointCallback) {
+        let alpha = 0;
+        const fadeInterval = setInterval(() => {
+            alpha += 0.05;
+            this.fadeAlpha = alpha;
+
+            if (alpha >= 1) {
+                clearInterval(fadeInterval);
+                onMidpointCallback();
+                
+                const fadeInInterval = setInterval(() => {
+                    alpha -= 0.05;
+                    this.fadeAlpha = Math.max(0, alpha);
+                    if (alpha <= 0) {
+                        clearInterval(fadeInInterval);
+                    }
+                }, 30);
+            }
+        }, 30);
+    }
+
     update() {
-        if (!this.isWaitingAtObstacle) {
+        // Continuous world scrolling movement when running
+        if (!this.isWaitingAtObstacle && !this.isTransitioning) {
             this.worldDistance += this.hero.speed;
 
             if (this.worldDistance >= this.targetObstacleDistance) {
@@ -175,6 +215,11 @@ class GameEngine {
             }
         }
 
+        // Keep player's right edge strictly at 1/4th of screen width
+        const quarterScreenWidth = this.canvas.width * 0.25;
+        this.hero.x = quarterScreenWidth - this.hero.width;
+
+        // Update particles
         this.particles.update();
     }
 
@@ -188,14 +233,12 @@ class GameEngine {
         if (screenX > -200 && screenX < this.canvas.width + 200) {
             this.ctx.save();
 
-            // Retrieve loaded image from AssetManager
             const currentObstaclePath = this.levelObstacleImages[this.currentLetterIndex];
             const obstacleImg = currentObstaclePath ? this.assets.get(currentObstaclePath) : null;
 
             let targetHeight = 155; 
             let targetWidth = 140;
 
-            // Dynamic aspect ratio calculation to prevent stretching
             if (obstacleImg && obstacleImg.naturalHeight !== 0) {
                 const aspectRatio = obstacleImg.naturalWidth / obstacleImg.naturalHeight;
                 targetWidth = targetHeight * aspectRatio;
@@ -217,7 +260,6 @@ class GameEngine {
                 );
             }
 
-            // Challenge Letter Badge centered at ~30% from top of screen
             if (this.isWaitingAtObstacle) {
                 const badgeY = this.canvas.height * 0.30; 
                 const pulse = Math.sin(Date.now() / 150) * 6;
@@ -260,29 +302,38 @@ class GameEngine {
 
     drawHero() {
         const playerConfig = this.assets.config?.player;
-        const heroPath = this.isWaitingAtObstacle ? playerConfig?.idle : playerConfig?.running;
-        const img = heroPath ? this.assets.get(heroPath) : null;
+        let heroPath;
 
-        // Scaled hero height and width
-        let targetHeight = 270;
-        let targetWidth = 190;
-
-        if (img && img.naturalHeight !== 0) {
-            const aspectRatio = img.naturalWidth / img.naturalHeight;
-            targetWidth = targetHeight * aspectRatio;
+        if (this.isTransitioning) {
+            heroPath = playerConfig?.happy || playerConfig?.idle;
+        } else if (this.isWaitingAtObstacle) {
+            heroPath = playerConfig?.idle;
+        } else {
+            heroPath = playerConfig?.running;
         }
 
-        this.hero.width = targetWidth;
-        this.hero.height = targetHeight;
-        this.hero.y = this.groundY - targetHeight + 15;
+        const img = heroPath ? this.assets.get(heroPath) : null;
 
         this.ctx.save();
 
         if (img) {
-            this.ctx.drawImage(img, this.hero.x, this.hero.y, targetWidth, targetHeight);
+            let targetWidth = this.hero.width;
+            if (img.naturalHeight !== 0) {
+                targetWidth = this.hero.height * (img.naturalWidth / img.naturalHeight);
+            }
+            this.ctx.drawImage(img, this.hero.x, this.hero.y, targetWidth, this.hero.height);
         }
 
         this.ctx.restore();
+    }
+
+    drawFadeOverlay() {
+        if (this.fadeAlpha > 0) {
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(0, 0, 0, ${this.fadeAlpha})`;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.restore();
+        }
     }
 
     render() {
@@ -293,6 +344,8 @@ class GameEngine {
         this.drawObstacle();
         this.drawHero();
         this.particles.draw(this.ctx);
+        
+        this.drawFadeOverlay();
     }
 
     loop() {

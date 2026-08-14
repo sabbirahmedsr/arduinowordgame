@@ -185,8 +185,9 @@
 /* ==========================================
    MOBILE RESPONSIVENESS
    ========================================== */
+/* Update media query selector in css/hud.css */
 @media screen and (max-width: 480px) {
-    #serial-hud {
+    .serial-hud-container {
         padding: 10px 12px;
         bottom: 12px;
         gap: 8px;
