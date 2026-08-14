@@ -1,7 +1,24 @@
 {
   "words": [
-    { "word": "CAT", "image": "image/words/cat.webp" },
-    { "word": "BOOK", "image": "image/words/book.webp" },
-    { "word": "APPLE", "image": "image/words/apple.webp" }
+    { "word": "CAT", "image": "image/words/cat.png" },
+    { "word": "DOG", "image": "image/words/dog.png" },
+    { "word": "SUN", "image": "image/words/sun.png" },
+    { "word": "BALL", "image": "image/words/ball.png" },
+    { "word": "BOOK", "image": "image/words/book.png" },
+    { "word": "DUCK", "image": "image/words/duck.png" },
+    { "word": "FISH", "image": "image/words/fish.png" },
+    { "word": "STAR", "image": "image/words/star.png" },
+    { "word": "TREE", "image": "image/words/tree.png" },
+    { "word": "APPLE", "image": "image/words/apple.png" },
+    { "word": "BIRD", "image": "image/words/bird.png" },
+    { "word": "CAKE", "image": "image/words/cake.png" },
+    { "word": "FROG", "image": "image/words/frog.png" },
+    { "word": "LION", "image": "image/words/lion.png" },
+    { "word": "MOON", "image": "image/words/moon.png" },
+    { "word": "PENCIL", "image": "image/words/pencil.png" },
+    { "word": "FLOWER", "image": "image/words/flower.png" },
+    { "word": "MONKEY", "image": "image/words/monkey.png" },
+    { "word": "RABBIT", "image": "image/words/rabbit.png" },
+    { "word": "TURTLE", "image": "image/words/turtle.png" }
   ]
 }
