@@ -1,6 +1,5 @@
 /* *********************************************************
-   Module 1.21.0 : Fully Opaque Foliage Engine (No Opacity Bleed)
-   Description: Uses shared AssetManager resources and optimized config.
+   Module 1.21.0 : Parallax Background Engine (Cull Optimized)
 ************************************************************/
 
 class ParallaxBackground {
@@ -9,7 +8,6 @@ class ParallaxBackground {
         this.ctx = ctx;
         this.assets = assetManager;
 
-        // Assets Reference Collections
         this.groundImg = null;
         this.treeAssets = { bg: [], fg: [] };
         this.bushAssets = [];
@@ -18,7 +16,6 @@ class ParallaxBackground {
         this.cloudAssets = [];
         this.config = null;
 
-        // Dynamic Elements Collections
         this.groundElements = []; 
         this.activeClouds = [];
         this.spawnedBottomOverlay = { flowers: [], bushes: [] };
@@ -37,7 +34,6 @@ class ParallaxBackground {
             const response = await fetch('./data/environmentConfig.json');
             this.config = await response.json();
 
-            // Populate asset references directly from AssetManager
             const env = this.assets.config?.environment || {};
 
             if (env.ground?.v3) {
@@ -127,7 +123,6 @@ class ParallaxBackground {
         const treeConf = this.config.treeZone;
         const foliageConf = this.config.foliageZone;
 
-        // 1. Background Trees
         if (this.treeAssets.bg.length > 0 && treeConf) {
             const settings = treeConf.bgTreeSettings;
             let currentX = startX;
@@ -148,7 +143,6 @@ class ParallaxBackground {
             }
         }
 
-        // 2. Foreground Trees
         if (this.treeAssets.fg.length > 0 && treeConf) {
             const settings = treeConf.fgTreeSettings;
             let currentX = startX + 120;
@@ -169,7 +163,6 @@ class ParallaxBackground {
             }
         }
 
-        // 3. Bushes & Flowers
         if (foliageConf) {
             let currentX = startX + 40;
             const combinedDensity = (foliageConf.bushDensity || 1.2) + (foliageConf.flowerDensity || 0.5);
@@ -196,10 +189,8 @@ class ParallaxBackground {
             }
         }
 
-        // 4. Depth Sorting
         this.groundElements.sort((a, b) => b.bottomRatio - a.bottomRatio);
 
-        // 5. Camera Bottom Overlay
         if (this.config.bottomOverlaySettings) {
             const settings = this.config.bottomOverlaySettings;
             let currentX = startX;
@@ -250,8 +241,9 @@ class ParallaxBackground {
         const amplitude = conf.floatAmplitude || 6;
         const totalSpan = screenWidth + 600;
 
-        this.activeClouds.forEach(cloud => {
-            if (!cloud.img) return;
+        for (let i = 0; i < this.activeClouds.length; i++) {
+            const cloud = this.activeClouds[i];
+            if (!cloud.img) continue;
 
             cloud.x += cloud.driftSpeed * deltaTime;
             cloud.noisePhase += cloud.noiseSpeed * deltaTime;
@@ -267,11 +259,8 @@ class ParallaxBackground {
             const drawHeight = cloud.img.height * cloud.scale;
             const drawY = (screenHeight * cloud.baseTopYRatio) + sineYOffset;
 
-            this.ctx.save();
-            this.ctx.globalAlpha = 1.0;
             this.ctx.drawImage(cloud.img, wrappedX, drawY, drawWidth, drawHeight);
-            this.ctx.restore();
-        });
+        }
     }
 
     drawMountains(worldDistance) {
@@ -285,8 +274,9 @@ class ParallaxBackground {
         const topY = screenHeight * (conf.topYRatio || 0.22);
         const mountainHeight = screenHeight * (conf.heightRatio || 0.32);
 
-        this.mountainAssets.forEach((img, index) => {
-            if (!img) return;
+        for (let index = 0; index < this.mountainAssets.length; index++) {
+            const img = this.mountainAssets[index];
+            if (!img) continue;
 
             const layerSpeed = speed * (1 + index * 0.15); 
             const scale = mountainHeight / img.height;
@@ -294,15 +284,10 @@ class ParallaxBackground {
 
             const offsetX = (worldDistance * layerSpeed) % drawWidth;
 
-            this.ctx.save();
-            this.ctx.globalAlpha = 1.0;
-
             for (let x = -drawWidth; x < screenWidth + drawWidth; x += drawWidth) {
                 this.ctx.drawImage(img, x - offsetX, topY, drawWidth, mountainHeight);
             }
-
-            this.ctx.restore();
-        });
+        }
     }
 
     drawGroundElements(worldDistance) {
@@ -310,41 +295,39 @@ class ParallaxBackground {
 
         const screenWidth = this.canvas.width;
         const screenHeight = this.canvas.height;
-        const speed = 1.0; 
 
         const depthVis = this.config.depthVisuals || { minBlur: 0, maxBlur: 2 };
         const minZoneRatio = 0.3750;
         const maxZoneRatio = 0.5000;
 
-        this.groundElements.forEach(item => {
+        for (let i = 0; i < this.groundElements.length; i++) {
+            const item = this.groundElements[i];
             const img = item.img;
-            if (!img) return;
+            if (!img) continue;
 
-            const screenX = item.x - (worldDistance * speed);
+            const screenX = item.x - worldDistance;
 
             if (screenX > -300 && screenX < screenWidth + 300) {
-                const depthFactor = (item.bottomRatio - minZoneRatio) / (maxZoneRatio - minZoneRatio);
-                const clampedFactor = Math.max(0, Math.min(1, depthFactor));
-                const calculatedBlur = depthVis.minBlur + (depthVis.maxBlur - depthVis.minBlur) * clampedFactor;
-
-                this.ctx.save();
-                this.ctx.globalAlpha = 1.0;
-
-                if (calculatedBlur > 0.1) {
-                    this.ctx.filter = `blur(${calculatedBlur.toFixed(1)}px)`;
-                }
-
                 const drawWidth = img.width * item.scale;
                 const drawHeight = img.height * item.scale;
-
                 const drawX = screenX - (drawWidth / 2);
                 const anchorY = screenHeight * (1.0 - item.bottomRatio);
                 const drawY = anchorY - drawHeight;
 
-                this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                this.ctx.restore();
+                const depthFactor = (item.bottomRatio - minZoneRatio) / (maxZoneRatio - minZoneRatio);
+                const clampedFactor = Math.max(0, Math.min(1, depthFactor));
+                const calculatedBlur = depthVis.minBlur + (depthVis.maxBlur - depthVis.minBlur) * clampedFactor;
+
+                if (calculatedBlur > 0.1) {
+                    this.ctx.save();
+                    this.ctx.filter = `blur(${calculatedBlur.toFixed(1)}px)`;
+                    this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                    this.ctx.restore();
+                } else {
+                    this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                }
             }
-        });
+        }
     }
 
     drawBottomOverlay(worldDistance) {
@@ -354,26 +337,26 @@ class ParallaxBackground {
         const screenWidth = this.canvas.width;
         const screenHeight = this.canvas.height;
         const speed = settings.speed || 1.30;
+        const blurVal = settings.blur || 3;
+        const brightnessVal = settings.brightness || 0.65;
 
         const renderOrder = [this.spawnedBottomOverlay.flowers, this.spawnedBottomOverlay.bushes];
 
-        renderOrder.forEach(itemList => {
-            if (!itemList) return;
+        this.ctx.save();
+        this.ctx.filter = `blur(${blurVal}px) brightness(${brightnessVal})`;
 
-            itemList.forEach(item => {
+        for (let r = 0; r < renderOrder.length; r++) {
+            const itemList = renderOrder[r];
+            if (!itemList) continue;
+
+            for (let i = 0; i < itemList.length; i++) {
+                const item = itemList[i];
                 const img = item.img;
-                if (!img) return;
+                if (!img) continue;
 
                 const screenX = item.x - (worldDistance * speed);
 
                 if (screenX > -300 && screenX < screenWidth + 300) {
-                    this.ctx.save();
-
-                    const blurVal = settings.blur || 3;
-                    const brightnessVal = settings.brightness || 0.65;
-                    this.ctx.filter = `blur(${blurVal}px) brightness(${brightnessVal})`;
-                    this.ctx.globalAlpha = 1.0;
-
                     const drawWidth = img.width * item.scale;
                     const drawHeight = img.height * item.scale;
 
@@ -381,10 +364,10 @@ class ParallaxBackground {
                     const drawY = (screenHeight + item.yOffset) - drawHeight;
 
                     this.ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                    this.ctx.restore();
                 }
-            });
-        });
+            }
+        }
+        this.ctx.restore();
     }
 
     drawGround(worldDistance) {
@@ -399,7 +382,7 @@ class ParallaxBackground {
         const scale = targetGroundHeight / this.groundImg.height;
         const drawWidth = this.groundImg.width * scale;
 
-        const offsetX = (worldDistance * 1.0) % drawWidth;
+        const offsetX = worldDistance % drawWidth;
 
         for (let x = -drawWidth; x < screenWidth + drawWidth; x += drawWidth) {
             this.ctx.drawImage(this.groundImg, x - offsetX, groundTopY, drawWidth, targetGroundHeight);

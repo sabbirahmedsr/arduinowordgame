@@ -1,12 +1,11 @@
 /* *********************************************************
-   Module 1.0.0 : Core Game Engine
-   Description: Optimized Engine with Arc Motion and Obstacle Burst
+   Module 1.0.0 : Core Game Engine (Performance Optimized)
 ************************************************************/
 
 class GameEngine {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { alpha: false }); // Disable canvas alpha context for rendering speed boost
 
         this.ui = new UIController();
         this.particles = new ParticleSystem();
@@ -16,7 +15,13 @@ class GameEngine {
 
         this.serial = new SerialController(
             (letter) => this.handleLetterInput(letter),
-            (rawData, decimalVal, mappedLetter) => this.ui.updateSerialHUD(rawData, decimalVal, mappedLetter)
+            (rawData, decimalVal, mappedLetter) => {
+                const expectedTarget = (this.isWaitingAtObstacle && this.currentLetterIndex < this.currentWord.length) 
+                    ? this.currentWord[this.currentLetterIndex] 
+                    : null;
+
+                this.ui.updateSerialHUD(rawData, decimalVal, mappedLetter, expectedTarget);
+            }
         );
 
         this.words = [];
@@ -31,6 +36,9 @@ class GameEngine {
 
         this.levelObstacleImages = [];
         this.hero = { x: 0, y: 0, width: 190, height: 270, speed: GameConfig.heroSpeed };
+
+        // Bind main loop method to prevent continuous memory allocation
+        this.loop = this.loop.bind(this);
 
         this.handleResize();
         this.bindEvents();
@@ -68,7 +76,6 @@ class GameEngine {
     }
 
     initLevel() {
-        // Clear lingering particles from previous level transition
         if (this.particles) {
             this.particles.clear();
         }
@@ -157,12 +164,10 @@ class GameEngine {
         const screenX = obstacleWorldX - this.worldDistance;
         const badgeY = this.canvas.height * 0.30;
 
-        // Badge Burst Effects
         this.particles.spawnExplosion(screenX, badgeY, '#ffffff', 25);
         this.particles.spawnExplosion(screenX, badgeY, '#ff4500', 35);
         this.particles.spawnExplosion(screenX, badgeY, '#ffd700', 25);
 
-        // Dynamic Obstacle Burst Effect
         const currentObstaclePath = this.levelObstacleImages[this.currentLetterIndex];
         const obstacleImg = currentObstaclePath ? this.assets.get(currentObstaclePath) : null;
         this.particles.spawnObstacleBurst(screenX, this.groundY - 140, 140, 155, obstacleImg);
@@ -173,12 +178,7 @@ class GameEngine {
         this.currentLetterIndex++;
         this.targetObstacleDistance += this.travelDistancePerObstacle;
 
-        // Calculate Next Obstacle World Position + Offset
-        const nextObstacleWorldX = this.targetObstacleDistance + (this.canvas.width / 2);
-        const offsetFromObstacle = 350;
         const nextWordItemWorldX = this.targetObstacleDistance + (this.canvas.width * 0.75);
-
-        // Trigger Horizontal Speed Dash
         this.wordItem.triggerDash(nextWordItemWorldX);
 
         if (this.currentLetterIndex >= this.currentWord.length) {
@@ -189,20 +189,15 @@ class GameEngine {
     triggerAutoTransition() {
         this.isTransitioning = true;
 
-        // 1. First trigger UI and Word Image center animations
         this.ui.triggerColorfulVictory(this.currentWord, () => {
-            
-            // 2. Breathing time: Wait while UI hint & Word Image are centered on screen
-            const breathingDelay = 1500; // 1.2 seconds breathing time (adjust if needed)
+            const breathingDelay = 1500;
 
             setTimeout(() => {
-                // 3. Fade Out transition starts after the pause
                 this.startFadeTransition(() => {
                     this.nextWord();
                     this.initLevel();
                 });
             }, breathingDelay);
-
         });
     }
 
@@ -227,6 +222,8 @@ class GameEngine {
         }, 30);
     }
 
+    /* GameEngine.js - update() method update */
+
     update() {
         if (!this.isWaitingAtObstacle && !this.isTransitioning) {
             this.worldDistance += this.hero.speed;
@@ -234,6 +231,18 @@ class GameEngine {
             if (this.worldDistance >= this.targetObstacleDistance) {
                 this.isWaitingAtObstacle = true;
             }
+        }
+
+        // Determine target letter for underline hint regardless of serial status
+        const expectedTarget = (this.isWaitingAtObstacle && this.currentLetterIndex < this.currentWord.length) 
+            ? this.currentWord[this.currentLetterIndex] 
+            : null;
+
+        // Continuously keep the HUD bit target hints active
+        if (!this.serial.isConnected) {
+            // When disconnected, rawData is 8 zeros, decimal is 0, mapped letter is '?'
+            const emptyBits = [0, 0, 0, 0, 0, 0, 0, 0];
+            this.ui.updateSerialHUD(emptyBits, 0, '?', expectedTarget);
         }
 
         const quarterScreenWidth = this.canvas.width * 0.25;
@@ -337,24 +346,19 @@ class GameEngine {
 
         const img = heroPath ? this.assets.get(heroPath) : null;
 
-        this.ctx.save();
-
         if (img && img.naturalHeight !== 0) {
-            // Fetch state scale factor from JSON resources (default to 1.0)
+            this.ctx.save();
             const scale = playerConfig?.scales?.[stateKey] || 1.0;
 
-            // Calculate scaled dimensions
             const renderHeight = this.hero.height * scale;
             const aspectRatio = img.naturalWidth / img.naturalHeight;
             const renderWidth = renderHeight * aspectRatio;
 
-            // Keep player feet locked on the ground surface
             const renderY = (this.groundY + 15) - renderHeight;
 
             this.ctx.drawImage(img, this.hero.x, renderY, renderWidth, renderHeight);
+            this.ctx.restore();
         }
-
-        this.ctx.restore();
     }
 
     drawFadeOverlay() {
@@ -372,7 +376,6 @@ class GameEngine {
         this.parallax.draw(this.worldDistance);
         this.drawObstacle();
 
-        // Render Word Item via WordItem instance with Particle System reference
         this.wordItem.draw(this.ctx, {
             canvasWidth: this.canvas.width,
             canvasHeight: this.canvas.height,
@@ -391,11 +394,19 @@ class GameEngine {
     loop() {
         this.update();
         this.render();
-        requestAnimationFrame(() => this.loop());
+        requestAnimationFrame(this.loop);
     }
 
     async start() {
         await this.assets.loadResources('./data/resources.json');
+        
+        // Pass loaded letterMap to UI Controller
+        if (this.serial && this.serial.letterMap) {
+            this.ui.setLetterMap(this.serial.letterMap);
+        } else if (this.assets.config?.letterMap) {
+            this.ui.setLetterMap(this.assets.config.letterMap);
+        }
+
         this.setupWordData();
         await this.parallax.init();
         this.initLevel();

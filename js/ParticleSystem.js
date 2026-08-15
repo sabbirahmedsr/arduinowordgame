@@ -1,16 +1,18 @@
 /* *********************************************************
-   Module 1.0.3 : Particle System
-   Description: Screen-anchored speed lines and 4-point curved 
-                glitter star rendering for victory glow.
+   Module 1.0.3 : Particle System (O(1) Memory Optimized)
 ************************************************************/
 
 class ParticleSystem {
     constructor() {
         this.particles = [];
+        this.sampleCanvas = document.createElement('canvas');
+        this.sampleCanvas.width = 10;
+        this.sampleCanvas.height = 10;
+        this.sampleCtx = this.sampleCanvas.getContext('2d', { willReadFrequently: true });
     }
-    // Clears all active particles instantly during level reset
+
     clear() {
-        this.particles = [];
+        this.particles.length = 0;
     }
 
     spawnExplosion(x, y, color = '#ff7700', count = 30) {
@@ -38,16 +40,10 @@ class ParticleSystem {
 
         if (imageElement && imageElement.naturalWidth) {
             try {
-                const offscreenCanvas = document.createElement('canvas');
-                offscreenCanvas.width = 10;
-                offscreenCanvas.height = 10;
-                const offCtx = offscreenCanvas.getContext('2d');
-                offCtx.drawImage(imageElement, 0, 0, 10, 10);
-                const data = offCtx.getImageData(5, 5, 1, 1).data;
+                this.sampleCtx.drawImage(imageElement, 0, 0, 10, 10);
+                const data = this.sampleCtx.getImageData(5, 5, 1, 1).data;
                 sampleColors.push(`rgb(${data[0]}, ${data[1]}, ${data[2]})`);
-            } catch (e) {
-                // Fallback palette
-            }
+            } catch (e) {}
         }
 
         for (let i = 0; i < 45; i++) {
@@ -58,7 +54,6 @@ class ParticleSystem {
         }
     }
 
-    // Screen-space anchored speed lines (Immune to world scrolling)
     spawnSpeedLines(screenX, screenY, height) {
         for (let i = 0; i < 3; i++) {
             this.particles.push({
@@ -66,7 +61,7 @@ class ParticleSystem {
                 x: screenX + (Math.random() * 30),
                 y: screenY + (Math.random() * height),
                 length: Math.random() * 90 + 50,
-                vx: -(Math.random() * 20 + 15), // Smooth leftwards sweep in screen space
+                vx: -(Math.random() * 20 + 15),
                 color: 'rgba(255, 255, 255, 0.95)',
                 alpha: 0.9,
                 thickness: Math.random() * 2.5 + 1,
@@ -75,7 +70,6 @@ class ParticleSystem {
         }
     }
 
-    // Tiny Magical Glitter Star Sparkles
     spawnVictorySparkle(x, y, width, height) {
         if (Math.random() < 0.5) {
             const colors = ['#ffffff', '#fde047', '#38bdf8', '#e0e7ff', '#f43f5e'];
@@ -83,7 +77,7 @@ class ParticleSystem {
                 type: 'glitter',
                 x: x + (Math.random() * width),
                 y: y + (Math.random() * height),
-                size: Math.random() * 3.5 + 2, // Smaller, subtle size
+                size: Math.random() * 3.5 + 2,
                 maxSize: Math.random() * 5 + 3,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 alpha: 1,
@@ -110,13 +104,15 @@ class ParticleSystem {
                 p.rotation += 0.05;
             }
 
+            // O(1) Fast Swap-and-Pop Deletion
             if (p.alpha <= 0) {
-                this.particles.splice(i, 1);
+                const lastIdx = this.particles.length - 1;
+                this.particles[i] = this.particles[lastIdx];
+                this.particles.pop();
             }
         }
     }
 
-    // Helper method to draw curved 4-pointed glitter star
     drawGlitterStar(ctx, x, y, size, rotation) {
         ctx.save();
         ctx.translate(x, y);
@@ -135,8 +131,10 @@ class ParticleSystem {
     }
 
     draw(ctx) {
+        if (this.particles.length === 0) return;
         ctx.save();
-        for (const p of this.particles) {
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
             ctx.globalAlpha = Math.max(0, p.alpha);
 
             if (p.type === 'circle') {
@@ -160,4 +158,4 @@ class ParticleSystem {
         }
         ctx.restore();
     }
-}   
+}

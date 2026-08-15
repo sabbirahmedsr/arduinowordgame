@@ -221,3 +221,23 @@
         font-size: 26px;
     }
 }
+
+/* ==========================================
+   FIXED THIN UNDERLINE HINT (NO GLOW / NO ANIMATION)
+   ========================================== */
+.bit-cell.target-hint {
+    position: relative;
+}
+
+/* Extra Thin Underline */
+.bit-cell.target-hint::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 1.5px;
+    background-color: #38bdf8;
+    border-radius: 1px;
+}
