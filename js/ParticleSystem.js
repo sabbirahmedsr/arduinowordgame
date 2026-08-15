@@ -1,75 +1,163 @@
 /* *********************************************************
-   Module 1.0.1 : Pure Explosive Particle System
-   Description: Clean Sharp 360-Degree Outward Particle Burst
+   Module 1.0.3 : Particle System
+   Description: Screen-anchored speed lines and 4-point curved 
+                glitter star rendering for victory glow.
 ************************************************************/
-
-class Particle {
-    constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-
-        // High velocity burst strictly outward in 360 degrees
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 15 + 6;
-
-        this.vx = Math.cos(angle) * speed;
-        this.vy = Math.sin(angle) * speed;
-
-        // Micro spark sizes
-        this.size = Math.random() * 3 + 2; 
-        this.alpha = 1.0;
-        this.decay = Math.random() * 0.05 + 0.04; 
-    }
-
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        
-        // Decelerate smoothly without gravity drop
-        this.vx *= 0.90; 
-        this.vy *= 0.90;
-        this.alpha -= this.decay;
-    }
-
-    draw(ctx) {
-        if (this.alpha <= 0) return;
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.fillStyle = this.color;
-        
-        // Minimal subtle glow
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = 2;
-
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-}
 
 class ParticleSystem {
     constructor() {
         this.particles = [];
     }
+    // Clears all active particles instantly during level reset
+    clear() {
+        this.particles = [];
+    }
 
-    spawnExplosion(x, y, color, count = 30) {
+    spawnExplosion(x, y, color = '#ff7700', count = 30) {
         for (let i = 0; i < count; i++) {
-            this.particles.push(new Particle(x, y, color));
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 8 + 2;
+
+            this.particles.push({
+                type: 'circle',
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 2,
+                color: color,
+                size: Math.random() * 6 + 3,
+                alpha: 1,
+                decay: Math.random() * 0.03 + 0.015,
+                gravity: 0.2
+            });
+        }
+    }
+
+    spawnObstacleBurst(x, y, width, height, imageElement) {
+        let sampleColors = ['#8B5A2B', '#5C4033', '#A0522D', '#D2B48C', '#4A5D23'];
+
+        if (imageElement && imageElement.naturalWidth) {
+            try {
+                const offscreenCanvas = document.createElement('canvas');
+                offscreenCanvas.width = 10;
+                offscreenCanvas.height = 10;
+                const offCtx = offscreenCanvas.getContext('2d');
+                offCtx.drawImage(imageElement, 0, 0, 10, 10);
+                const data = offCtx.getImageData(5, 5, 1, 1).data;
+                sampleColors.push(`rgb(${data[0]}, ${data[1]}, ${data[2]})`);
+            } catch (e) {
+                // Fallback palette
+            }
+        }
+
+        for (let i = 0; i < 45; i++) {
+            const spawnX = x - (width / 2) + (Math.random() * width);
+            const spawnY = y + (Math.random() * height);
+            const chosenColor = sampleColors[Math.floor(Math.random() * sampleColors.length)];
+            this.spawnExplosion(spawnX, spawnY, chosenColor, 1);
+        }
+    }
+
+    // Screen-space anchored speed lines (Immune to world scrolling)
+    spawnSpeedLines(screenX, screenY, height) {
+        for (let i = 0; i < 3; i++) {
+            this.particles.push({
+                type: 'speedline',
+                x: screenX + (Math.random() * 30),
+                y: screenY + (Math.random() * height),
+                length: Math.random() * 90 + 50,
+                vx: -(Math.random() * 20 + 15), // Smooth leftwards sweep in screen space
+                color: 'rgba(255, 255, 255, 0.95)',
+                alpha: 0.9,
+                thickness: Math.random() * 2.5 + 1,
+                decay: 0.04
+            });
+        }
+    }
+
+    // Tiny Magical Glitter Star Sparkles
+    spawnVictorySparkle(x, y, width, height) {
+        if (Math.random() < 0.5) {
+            const colors = ['#ffffff', '#fde047', '#38bdf8', '#e0e7ff', '#f43f5e'];
+            this.particles.push({
+                type: 'glitter',
+                x: x + (Math.random() * width),
+                y: y + (Math.random() * height),
+                size: Math.random() * 3.5 + 2, // Smaller, subtle size
+                maxSize: Math.random() * 5 + 3,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                alpha: 1,
+                decay: 0.03,
+                rotation: Math.random() * Math.PI
+            });
         }
     }
 
     update() {
         for (let i = this.particles.length - 1; i >= 0; i--) {
-            this.particles[i].update();
-            if (this.particles[i].alpha <= 0) {
+            const p = this.particles[i];
+
+            if (p.type === 'circle') {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.alpha -= p.decay;
+            } else if (p.type === 'speedline') {
+                p.x += p.vx;
+                p.alpha -= p.decay;
+            } else if (p.type === 'glitter') {
+                p.alpha -= p.decay;
+                p.rotation += 0.05;
+            }
+
+            if (p.alpha <= 0) {
                 this.particles.splice(i, 1);
             }
         }
     }
 
-    draw(ctx) {
-        this.particles.forEach(p => p.draw(ctx));
+    // Helper method to draw curved 4-pointed glitter star
+    drawGlitterStar(ctx, x, y, size, rotation) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.quadraticCurveTo(0, 0, size, 0);
+        ctx.quadraticCurveTo(0, 0, 0, size);
+        ctx.quadraticCurveTo(0, 0, -size, 0);
+        ctx.quadraticCurveTo(0, 0, 0, -size);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
     }
-}
+
+    draw(ctx) {
+        ctx.save();
+        for (const p of this.particles) {
+            ctx.globalAlpha = Math.max(0, p.alpha);
+
+            if (p.type === 'circle') {
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (p.type === 'speedline') {
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = p.thickness;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.length, p.y);
+                ctx.stroke();
+            } else if (p.type === 'glitter') {
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 8;
+                this.drawGlitterStar(ctx, p.x, p.y, p.size, p.rotation);
+            }
+        }
+        ctx.restore();
+    }
+}   

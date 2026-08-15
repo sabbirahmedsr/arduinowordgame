@@ -49,9 +49,40 @@
       ]
     }
   },
+
+
   "player": {
     "idle": "player/Hero_Idle.webp",
     "running": "player/Hero_Running.webp",
-    "happy": "player/Hero_Happy.webp"
-  }
+    "happy": "player/Hero_Happy.webp",
+    "scales": {
+      "idle": 1.0,
+      "running": 1.0,
+      "happy": 1.48
+    }
+  },
+
+
+  "words": [
+    { "word": "CAT", "image": "words/cat.png" },
+    { "word": "DOG", "image": "words/dog.png" },
+    { "word": "SUN", "image": "words/sun.png" },
+    { "word": "BALL", "image": "words/ball.png" },
+    { "word": "BOOK", "image": "words/book.png" },
+    { "word": "DUCK", "image": "words/duck.png" },
+    { "word": "FISH", "image": "words/fish.png" },
+    { "word": "STAR", "image": "words/star.png" },
+    { "word": "TREE", "image": "words/tree.png" },
+    { "word": "APPLE", "image": "words/apple.png" },
+    { "word": "BIRD", "image": "words/bird.png" },
+    { "word": "CAKE", "image": "words/cake.png" },
+    { "word": "FROG", "image": "words/frog.png" },
+    { "word": "LION", "image": "words/lion.png" },
+    { "word": "MOON", "image": "words/moon.png" },
+    { "word": "PENCIL", "image": "words/pencil.png" },
+    { "word": "FLOWER", "image": "words/flower.png" },
+    { "word": "MONKEY", "image": "words/monkey.png" },
+    { "word": "RABBIT", "image": "words/rabbit.png" },
+    { "word": "TURTLE", "image": "words/turtle.png" }
+  ]
 }

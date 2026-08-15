@@ -33,7 +33,9 @@ class UIController {
         }
     }
 
-    triggerColorfulVictory(word, imageSrc, onComplete) {
+    /* Updated triggerColorfulVictory method signature to remove duplicate UI image creation */
+
+    triggerColorfulVictory(word, onComplete) {
         this.container.classList.add('victory-mode');
 
         const letters = this.container.children;
@@ -52,16 +54,8 @@ class UIController {
 
             const totalLettersTime = letters.length * 150;
             setTimeout(() => {
-                if (imageSrc) {
-                    this.victoryImgContainer.innerHTML = `<img src="${imageSrc}" alt="${word}" />`;
-                    this.victoryImgContainer.classList.add('show');
-                }
-
-                setTimeout(() => {
-                    if (onComplete) onComplete();
-                }, 1200);
-
-            }, totalLettersTime + 200);
+                if (onComplete) onComplete();
+            }, totalLettersTime + 800);
 
         }, 350);
     }
