@@ -1,73 +1,134 @@
-const int buttons[8] = {2, 3, 4, 5, 6, 7, 8, 9};
+// Define analog input pins for the 5 active optical channels
+const int SENSOR_PINS[5] = {A0, A1, A2, A3, A4};
 
-int values[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-int lastValues[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+// Calibrated threshold values calculated from optical testing
+const int THRESHOLDS[5] = {477, 462, 869, 487, 428};
 
-unsigned long lastCheck = 0;
-unsigned long lastPrint = 0;
+// 8-bit state storage arrays
+byte currentState[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte lastWrittenState[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-const unsigned long CHECK_INTERVAL = 100;    // 10 FPS
-const unsigned long PRINT_INTERVAL = 1000;   // 1 second
+// Timing and verification configurations
+unsigned long lastWriteTime = 0;
+const unsigned long NORMAL_INTERVAL = 1000; // Default 1-second transmission heartbeat
+const unsigned long DEBOUNCE_INTERVAL = 100; // 0.1-second verification sampling interval
 
-void printValues() {
-  Serial.print("[");
+// Function to read all 5 analog sensors with default state zero-override
+void readSensors(byte *arr) {
+  arr[0] = 0;
+  arr[1] = 0;
+  arr[2] = 0;
 
-  for (int i = 0; i < 8; i++) {
-    Serial.print(values[i]);
+  bool allUnblocked = true;
 
-    if (i < 7) {
-      Serial.print(",");
+  for (int i = 0; i < 5; i++) {
+    int analogVal = analogRead(SENSOR_PINS[i]);
+    
+    // Check light contact condition
+    if (analogVal < THRESHOLDS[i]) {
+      arr[i + 3] = 1; // Light received (Unblocked)
+    } else {
+      arr[i + 3] = 0; // Light interrupted (Blocked)
+      allUnblocked = false; // At least one channel is blocked
     }
   }
 
+  // Override logic: If all 5 sensors are unblocked (1,1,1,1,1), set all to 0
+  if (allUnblocked) {
+    for (int i = 3; i < 8; i++) {
+      arr[i] = 0;
+    }
+  }
+}
+
+// Helper function to compare two 8-bit arrays
+bool areArraysEqual(byte *arr1, byte *arr2) {
+  for (int i = 0; i < 8; i++) {
+    if (arr1[i] != arr2[i]) return false;
+  }
+  return true;
+}
+
+// Helper function to copy array content
+void copyArray(byte *src, byte *dest) {
+  for (int i = 0; i < 8; i++) {
+    dest[i] = src[i];
+  }
+}
+
+// Helper function to print 8-bit array via Serial Monitor
+void printArray(byte *arr) {
+  Serial.print("[");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(arr[i]);
+    if (i < 7) {
+      Serial.print(", ");
+    }
+  }
   Serial.println("]");
 }
 
 void setup() {
   Serial.begin(9600);
 
-  for (int i = 0; i < 8; i++) {
-    pinMode(buttons[i], INPUT_PULLUP);
+  // Configure internal pull-up resistors for all active channels
+  for (int i = 0; i < 5; i++) {
+    pinMode(SENSOR_PINS[i], INPUT_PULLUP);
   }
 
-  // Initial state
-  for (int i = 0; i < 8; i++) {
-    values[i] = (digitalRead(buttons[i]) == LOW) ? 1 : 0;
-    lastValues[i] = values[i];
-  }
-
-  printValues();
-  lastPrint = millis();
+  // Initial read and baseline broadcast
+  readSensors(lastWrittenState);
+  printArray(lastWrittenState);
+  lastWriteTime = millis();
 }
 
 void loop() {
-  unsigned long now = millis();
+  readSensors(currentState);
 
-  // Check inputs at 10 FPS
-  if (now - lastCheck >= CHECK_INTERVAL) {
-    lastCheck = now;
+  // Check if current sensor readings differ from the last transmitted output
+  if (!areArraysEqual(currentState, lastWrittenState)) {
+    byte candidateState[8];
+    copyArray(currentState, candidateState);
+    int matchCount = 1; // First sample recorded
+    unsigned long verifyStartTime = millis();
 
-    bool changed = false;
+    // Fast verification loop running every 0.1 seconds
+    while (true) {
+      delay(DEBOUNCE_INTERVAL);
+      byte checkState[8];
+      readSensors(checkState);
 
-    for (int i = 0; i < 8; i++) {
-      values[i] = (digitalRead(buttons[i]) == LOW) ? 1 : 0;
+      if (areArraysEqual(checkState, candidateState)) {
+        matchCount++;
+      } else {
+        // Reset match counter if signal fluctuates
+        copyArray(checkState, candidateState);
+        matchCount = 1;
+      }
 
-      if (values[i] != lastValues[i]) {
-        changed = true;
-        lastValues[i] = values[i];
+      // Verification Success: 3 consecutive matching samples verified (~0.2s total)
+      if (matchCount >= 3) {
+        copyArray(candidateState, lastWrittenState);
+        printArray(lastWrittenState);
+        lastWriteTime = millis();
+        break;
+      }
+
+      // Safety Timeout: Exit loop if verification takes longer than 1 second
+      if (millis() - verifyStartTime >= NORMAL_INTERVAL) {
+        copyArray(checkState, lastWrittenState);
+        printArray(lastWrittenState);
+        lastWriteTime = millis();
+        break;
       }
     }
-
-    // Change detected → print immediately
-    if (changed) {
-      printValues();
-      lastPrint = now;
+  } else {
+    // Normal state: Heartbeat transmission every 1 second
+    if (millis() - lastWriteTime >= NORMAL_INTERVAL) {
+      printArray(lastWrittenState);
+      lastWriteTime = millis();
     }
   }
 
-  // No change → print once every second
-  if (now - lastPrint >= PRINT_INTERVAL) {
-    printValues();
-    lastPrint = now;
-  }
+  delay(20); // Small loop stability delay
 }
